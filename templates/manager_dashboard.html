@@ -90,6 +90,16 @@
 
         .slot-list {
             margin-bottom: 1rem;
+            list-style: none;
+            padding: 0;
+        }
+
+        .slot-list li {
+            background: #f4f4f4;
+            color: #333;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 5px;
         }
 
         .add-slot {
@@ -116,15 +126,18 @@
             const newSlot = slotInput.value.trim();
 
             if (newSlot) {
+                // Create list item for the slot
                 const li = document.createElement('li');
                 li.textContent = newSlot;
 
+                // Add hidden input to submit this slot with the form
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = 'custom_slots[]';
                 input.value = newSlot;
                 li.appendChild(input);
 
+                // Append to the list and clear the input
                 slotList.appendChild(li);
                 slotInput.value = '';
             } else {
@@ -156,36 +169,10 @@
 
             <label>Available Time Slots:</label>
             <div class="add-slot">
-                <input type="text" id="new_slot" placeholder="Enter time slot (e.g., 10am-11am)"/>
+                <input type="text" id="new_slot" placeholder="Enter time slot (e.g., 10am-11am)">
                 <button type="button" onclick="addSlot()">Add Slot</button>
             </div>
             <ul id="custom_slots" class="slot-list"></ul>
-            <script>
-                function addSlot() {
-                    const slotInput = document.getElementById('new_slot');
-                    const slotList = document.getElementById('custom_slots');
-                    const newSlot = slotInput.value.trim();
-
-                    if (newSlot) {
-                        // Create list item for the slot
-                        const li = document.createElement('li');
-                        li.textContent = newSlot;
-
-                        // Add hidden input to submit this slot with the form
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = 'custom_slots[]';
-                        input.value = newSlot;
-                        li.appendChild(input);
-
-                        // Append to the list and clear the input
-                        slotList.appendChild(li);
-                        slotInput.value = '';
-                    } else {
-                        alert('Please enter a valid time slot.');
-                    }
-                }
-            </script>
 
             <label for="photo">Upload Photo:</label>
             <input type="file" id="photo" name="photo" required>

@@ -7,7 +7,7 @@ phases:
     commands:
       - echo "Installing dependencies..."
       - pip install --upgrade pip
-      - pip install -r requirements.txt pylint boto3 flask_sqlalchemy  # Install app dependencies and linting tools
+      - pip install -r requirements.txt pylint boto3 flask_sqlalchemy  # Install application dependencies and linting tools
 
   pre_build:
     commands:
@@ -18,8 +18,8 @@ phases:
 
   build:
     commands:
-      - echo "Building the application..."
-      - python app.py &  # Start the Flask app for testing purposes (if necessary)
+      - echo "Building the applicationlication..."
+      - python application.py &  # Start the Flask application for testing purposes (if necessary)
 
   post_build:
     commands:

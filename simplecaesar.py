@@ -17,7 +17,7 @@ if choice == "encode":
         if letter == ' ':
             encoded += ' '  # Preserve spaces
         elif letter in letters:
-            x = (letters.index(letter) + shift) % len(letters)  # Ensure wrapping
+            x = (letters.index(letter) + shift) % len(letters)  # Ensure wrapplicationing
             encoded += letters[x]
         else:
             encoded += letter  # Leave unsupported characters as is
@@ -26,7 +26,7 @@ elif choice == "decode":
         if letter == ' ':
             encoded += ' '  # Preserve spaces
         elif letter in letters:
-            x = (letters.index(letter) - shift) % len(letters)  # Ensure wrapping
+            x = (letters.index(letter) - shift) % len(letters)  # Ensure wrapplicationing
             encoded += letters[x]
         else:
             encoded += letter  # Leave unsupported characters as is
