@@ -1,160 +1,91 @@
-
-import uuid
-from flask import Flask, render_template, redirect, url_for, request, session, flash
+from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
-import boto3
-from botocore.exceptions import ClientError
-from decimal import Decimal  # Import Decimal to handle numeric values for DynamoDB
-
+import os
+import io
 
 application = Flask(__name__)
 application.secret_key = 'turfbookingsecret'
 
-# AWS Configuration
-application.config['AWS_REGION'] = 'eu-west-1'
-application.config['AWS_S3_BUCKET'] = 'turfbucket'
-application.config['DYNAMO_DB_USERS_TABLE'] = 'Users_turfbooking'
-application.config['DYNAMO_DB_TURFS_TABLE'] = 'Turfs_turfbooking'
-application.config['DYNAMO_DB_BOOKINGS_TABLE'] = 'Bookings_turfbooking'
+# Define base directory
+base_dir = os.path.abspath(os.path.dirname(__file__))
 
-# Initialize AWS Clients
-s3_client = boto3.client('s3', region_name=application.config['AWS_REGION'])
-dynamodb = boto3.resource('dynamodb', region_name=application.config['AWS_REGION'])
+# Configuration for SQLite database
+application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(base_dir, 'turf_system.db')
+application.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Helper Functions to Create Tables
-def create_table_if_not_exists(table_name, key_schema, attribute_definitions, provisioned_throughput):
-    try:
-        table = dynamodb.create_table(
-            TableName=table_name,
-            KeySchema=key_schema,
-            AttributeDefinitions=attribute_definitions,
-            ProvisionedThroughput=provisioned_throughput
-        )
-        table.wait_until_exists()
-        print(f"Table {table_name} created successfully!")
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'ResourceInUseException':
-            print(f"Table {table_name} already exists.")
-        else:
-            print(f"Error creating table {table_name}: {e}")
+# Initialize the database
+db = SQLAlchemy(application)
 
-# Create DynamoDB Tables
-def initialize_dynamo_tables():
-    create_table_if_not_exists(
-        application.config['DYNAMO_DB_USERS_TABLE'],
-        key_schema=[{'AttributeName': 'id', 'KeyType': 'HASH'}],
-        attribute_definitions=[{'AttributeName': 'id', 'AttributeType': 'S'}],
-        provisioned_throughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
-    )
 
-    create_table_if_not_exists(
-        application.config['DYNAMO_DB_TURFS_TABLE'],
-        key_schema=[{'AttributeName': 'id', 'KeyType': 'HASH'}],
-        attribute_definitions=[{'AttributeName': 'id', 'AttributeType': 'S'}],
-        provisioned_throughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
-    )
+# Models
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+    role = db.Column(db.String(10), nullable=False)  # 'admin', 'manager', 'user'
 
-    create_table_if_not_exists(
-        application.config['DYNAMO_DB_BOOKINGS_TABLE'],
-        key_schema=[{'AttributeName': 'id', 'KeyType': 'HASH'}],
-        attribute_definitions=[{'AttributeName': 'id', 'AttributeType': 'S'}],
-        provisioned_throughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
-    )
 
-# Helper Functions for DynamoDB
-def get_table(table_name):
-    return dynamodb.Table(table_name)
+class Turf(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    location = db.Column(db.String(200), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    time_slots = db.Column(db.String(500), nullable=False)  # Comma-separated slots
+    photo_data = db.Column(db.LargeBinary, nullable=True)  # Store image as binary
+    photo_name = db.Column(db.String(120), nullable=True)  # Optional: to store file name
+    manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    bookings = db.relationship('Booking', backref='turf', cascade="all, delete-orphan")
 
-def get_item(table_name, key):
-    table = get_table(table_name)
-    try:
-        response = table.get_item(Key=key)
-        return response.get('Item', None)
-    except ClientError as e:
-        print(f"Error getting item from {table_name}: {e}")
-        return None
 
-def put_item(table_name, item):
-    table = get_table(table_name)
-    try:
-        table.put_item(Item=item)
-    except ClientError as e:
-        print(f"Error putting item into {table_name}: {e}")
-        
-        
-# S3 Helper Function for File Upload
-def upload_file_to_s3(file, bucket_name):
-    filename = secure_filename(file.filename)
-    unique_filename = f"{uuid.uuid4().hex}_{filename}"
-    try:
-        s3_client.upload_fileobj(
-            file,
-            bucket_name,
-            unique_filename,
-            ExtraArgs={"ACL": "public-read", "ContentType": file.content_type}
-        )
-        return f"https://{bucket_name}.s3.{application.config['AWS_REGION']}.amazonaws.com/{unique_filename}"
-    except Exception as e:
-        print(f"Error uploading file to S3: {e}")
-        return None
-        
+class Booking(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    turf_id = db.Column(db.Integer, db.ForeignKey('turf.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    time_slot = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(20), default='Pending')
+
 
 # Routes
 @application.route('/')
 def home():
     return render_template('home.html')
 
+
 @application.route('/login', methods=['GET', 'POST'])
 def login():
-    # Hardcoded admin credentials
-    ADMIN_USERNAME = "admin"
-    ADMIN_PASSWORD = "admin123"
+    admin_username = "admin"
+    admin_password = "admin123"
 
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         role = request.form['role']
 
-        # Check if admin is logging in
+        # Handle Admin Login
         if role == "admin":
-            if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-                session['user_id'] = "admin-id"  # A unique identifier for admin
-                session['role'] = "admin"
+            if username == admin_username and password == admin_password:
+                session['role'] = 'admin'
                 return redirect(url_for('admin_dashboard'))
             else:
-                flash("Invalid admin credentials!")
+                flash('Invalid Admin credentials!')
 
+        # Handle Turf Manager and User Login
         else:
-            # Check for non-admin users in the DynamoDB table
-            table = get_table(application.config['DYNAMO_DB_USERS_TABLE'])
-            try:
-                response = table.scan(
-                    FilterExpression="#username = :u AND password = :p AND #role = :r",
-                    ExpressionAttributeValues={
-                        ":u": username,
-                        ":p": password,
-                        ":r": role
-                    },
-                    ExpressionAttributeNames={
-                        "#username": "username",
-                        "#role": "role"
-                    }
-                )
-                user = response['Items'][0] if response['Items'] else None
+            user = User.query.filter_by(username=username, password=password).first()
+            if user and user.role == role:
+                session['user_id'] = user.id
+                session['role'] = user.role
+                if role == 'manager':
+                    return redirect(url_for('manager_dashboard'))
+                elif role == 'user':
+                    return redirect(url_for('user_dashboard'))
+            else:
+                flash('Invalid credentials or role selection!')
 
-                if user:
-                    session['user_id'] = user['id']
-                    session['role'] = user['role']
-                    if role == 'manager':
-                        return redirect(url_for('manager_dashboard'))
-                    elif role == 'user':
-                        return redirect(url_for('user_dashboard'))
-                else:
-                    flash("Invalid credentials!")
-            except ClientError as e:
-                print(f"Error during login: {e}")
-                flash("An error occurred while logging in.")
     return render_template('login.html')
+
 
 @application.route('/register', methods=['GET', 'POST'])
 def register():
@@ -162,24 +93,20 @@ def register():
         username = request.form['username']
         email = request.form['email']
         password = request.form['password']
-        user_id = str(uuid.uuid4())
 
-        table = get_table(application.config['DYNAMO_DB_USERS_TABLE'])
-        response = table.scan(FilterExpression="username = :u OR email = :e",
-                              ExpressionAttributeValues={":u": username, ":e": email})
-        if response['Items']:
+        # Check for unique username and email
+        existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
+        if existing_user:
             flash('Username or email already exists!')
             return redirect(url_for('register'))
 
-        put_item(application.config['DYNAMO_DB_USERS_TABLE'], {
-            'id': user_id,
-            'username': username,
-            'email': email,
-            'password': password,
-            'role': 'user'
-        })
+        # Create a new user
+        new_user = User(username=username, email=email, password=password, role='user')
+        db.session.add(new_user)
+        db.session.commit()
         flash('Registration successful! Please log in.')
         return redirect(url_for('login'))
+
     return render_template('register.html')
 
 @application.route('/logout')
@@ -193,50 +120,14 @@ def logout():
 @application.route('/admin', methods=['GET', 'POST'])
 def admin_dashboard():
     if 'role' in session and session['role'] == 'admin':
-        table = get_table(application.config['DYNAMO_DB_USERS_TABLE'])
-        try:
-            response = table.scan(
-                FilterExpression="#role = :r",
-                ExpressionAttributeValues={":r": "manager"},
-                ExpressionAttributeNames={"#role": "role"}  # Alias the reserved keyword
-            )
-            managers = response.get('Items', [])
-        except ClientError as e:
-            print(f"Error fetching managers: {e}")
-            flash("An error occurred while fetching managers.")
-            managers = []
-
+        managers = User.query.filter_by(role='manager').all()
         if request.method == 'POST':
             username = request.form['username']
-            email = request.form['email']
             password = request.form['password']
-            manager_id = str(uuid.uuid4())
-
-            # Check for existing email or username
-            try:
-                existing_user_response = table.scan(
-                    FilterExpression="#username = :u OR email = :e",
-                    ExpressionAttributeValues={":u": username, ":e": email},
-                    ExpressionAttributeNames={"#username": "username"}  # Alias reserved keyword if needed
-                )
-                if existing_user_response.get('Items'):
-                    flash('Username or email already exists!')
-                    return redirect(url_for('admin_dashboard'))
-
-                # Add the new manager
-                table.put_item(Item={
-                    'id': manager_id,
-                    'username': username,
-                    'email': email,
-                    'password': password,
-                    'role': 'manager'
-                })
-                flash('Turf Manager added successfully.')
-            except ClientError as e:
-                print(f"Error adding manager: {e}")
-                flash("An error occurred while adding the manager.")
-            return redirect(url_for('admin_dashboard'))
-
+            new_manager = User(username=username, password=password, role='manager')
+            db.session.add(new_manager)
+            db.session.commit()
+            flash('Turf Manager added successfully.')
         return render_template('admin_dashboard.html', managers=managers)
     return redirect(url_for('login'))
 
@@ -244,43 +135,32 @@ def admin_dashboard():
 def add_manager():
     if 'role' in session and session['role'] == 'admin':
         username = request.form['username']
-        email = request.form['email']
+        email = request.form['email']  # Retrieve the email
         password = request.form['password']
-        manager_id = str(uuid.uuid4())  # Generate a unique ID for the manager
 
         # Check for existing email or username
-        table = get_table(application.config['DYNAMO_DB_USERS_TABLE'])
-        response = table.scan(FilterExpression="username = :u OR email = :e",
-                              ExpressionAttributeValues={":u": username, ":e": email})
-        if response['Items']:
+        existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
+        if existing_user:
             flash('Username or email already exists!')
             return redirect(url_for('admin_dashboard'))
 
         # Add the new manager
-        put_item(application.config['DYNAMO_DB_USERS_TABLE'], {
-            'id': manager_id,
-            'username': username,
-            'email': email,
-            'password': password,
-            'role': 'manager'
-        })
+        new_manager = User(username=username, email=email, password=password, role='manager')
+        db.session.add(new_manager)
+        db.session.commit()
         flash('Turf Manager added successfully.')
         return redirect(url_for('admin_dashboard'))
     return redirect(url_for('login'))
 
-
-@application.route('/admin/edit_manager/<manager_id>', methods=['GET'])
+@application.route('/admin/edit_manager/<int:manager_id>', methods=['GET'])
 def edit_manager(manager_id):
     if 'role' in session and session['role'] == 'admin':
-        table = get_table(application.config['DYNAMO_DB_USERS_TABLE'])
-        manager = get_item(application.config['DYNAMO_DB_USERS_TABLE'], {'id': manager_id})
-
-        if manager and manager['role'] == 'manager':
+        manager = User.query.get(manager_id)
+        if manager and manager.role == 'manager':
             return render_template('edit_manager.html', manager=manager)
         flash('Turf Manager not found.')
         return redirect(url_for('admin_dashboard'))
     return redirect(url_for('login'))
-
 
 @application.route('/admin/update_manager', methods=['POST'])
 def update_manager():
@@ -288,26 +168,21 @@ def update_manager():
         manager_id = request.form['manager_id']
         username = request.form['username']
         email = request.form['email']
-        password = request.form['password']
+        password = request.form['password']  # New password, if provided
 
-        table = get_table(application.config['DYNAMO_DB_USERS_TABLE'])
-        manager = get_item(application.config['DYNAMO_DB_USERS_TABLE'], {'id': manager_id})
-
-        if manager and manager['role'] == 'manager':
+        manager = User.query.get(manager_id)
+        if manager and manager.role == 'manager':
             # Update fields
-            updated_data = {
-                'id': manager_id,
-                'username': username,
-                'email': email,
-                'role': 'manager'
-            }
-            if password:
-                updated_data['password'] = password
+            manager.username = username
+            manager.email = email
+            if password:  # Only update password if a new one is provided
+                manager.password = password
 
             try:
-                put_item(application.config['DYNAMO_DB_USERS_TABLE'], updated_data)
+                db.session.commit()
                 flash('Turf Manager updated successfully.')
             except Exception as e:
+                db.session.rollback()
                 flash(f'Error updating manager: {str(e)}')
             return redirect(url_for('admin_dashboard'))
 
@@ -315,171 +190,132 @@ def update_manager():
         return redirect(url_for('admin_dashboard'))
     return redirect(url_for('login'))
 
-
 @application.route('/admin/delete_manager', methods=['POST'])
 def delete_manager():
     if 'role' in session and session['role'] == 'admin':
         manager_id = request.form['manager_id']
-        table = get_table(application.config['DYNAMO_DB_USERS_TABLE'])
-        manager = get_item(application.config['DYNAMO_DB_USERS_TABLE'], {'id': manager_id})
-
-        if manager and manager['role'] == 'manager':
-            try:
-                table.delete_item(Key={'id': manager_id})
-                flash('Turf Manager deleted successfully.')
-            except Exception as e:
-                flash(f'Error deleting manager: {str(e)}')
-        else:
-            flash('Turf Manager not found.')
+        manager = User.query.get(manager_id)
+        if manager:
+            db.session.delete(manager)
+            db.session.commit()
+            flash('Turf Manager deleted successfully.')
         return redirect(url_for('admin_dashboard'))
-    return redirect(url_for('login'))
 
 
 @application.route('/manager_dashboard', methods=['GET', 'POST'])
 def manager_dashboard():
     if 'user_id' in session and session['role'] == 'manager':
         if request.method == 'POST':
-            name = request.form.get('name', '')
-            location = request.form.get('location', '')
-            price = request.form.get('price', '0.0')
-            photo = request.files.get('photo', None)
+            name = request.form['name']
+            location = request.form['location']
+            price = request.form['price']
+            photo = request.files['photo']
+
+            # Combine custom slots into a comma-separated string
             custom_slots = request.form.getlist('custom_slots[]')
-            time_slots = ','.join(custom_slots) if custom_slots else ''
+            time_slots = ','.join(custom_slots)
 
             if photo:
-                s3_url = upload_file_to_s3(photo, application.config['AWS_S3_BUCKET'])
-                if not s3_url:
-                    flash('Failed to upload image to S3.')
-                    return redirect(url_for('manager_dashboard'))
+                filename = secure_filename(photo.filename)
+                photo_data = photo.read()  # Read binary data of the image
 
-                # Convert price to Decimal before inserting into DynamoDB
-                table = get_table(application.config['DYNAMO_DB_TURFS_TABLE'])
-                turf_id = str(uuid.uuid4())
-                table.put_item(Item={
-                    'id': turf_id,
-                    'name': name,
-                    'location': location,
-                    'price': Decimal(price),  # Convert price to Decimal
-                    'time_slots': time_slots,
-                    'photo': s3_url,
-                    'manager_id': session['user_id']
-                })
+                # Create a new Turf entry
+                turf = Turf(
+                    name=name,
+                    location=location,
+                    price=float(price),
+                    time_slots=time_slots,
+                    photo_data=photo_data,  # Store binary data
+                    photo_name=filename,    # Store file name
+                    manager_id=session['user_id']
+                )
+                db.session.add(turf)
+                db.session.commit()
                 flash('Turf added successfully!')
 
-        # Fetch turfs managed by the current manager
-        table = get_table(application.config['DYNAMO_DB_TURFS_TABLE'])
-        response = table.scan(
-            FilterExpression="manager_id = :m_id",
-            ExpressionAttributeValues={":m_id": session['user_id']}
-        )
-        turfs = response.get('Items', [])
-        for turf in turfs:
-            turf['time_slots_list'] = turf.get('time_slots', '').split(',') if turf.get('time_slots') else []
-
+        turfs = Turf.query.filter_by(manager_id=session['user_id']).all()
         return render_template('manager_dashboard.html', turfs=turfs)
     return redirect(url_for('login'))
-    
+
+
 @application.route('/view_turfs', methods=['GET'])
 def view_turfs():
     if 'user_id' in session and session.get('role') == 'manager':
-        turfs_table = get_table(application.config['DYNAMO_DB_TURFS_TABLE'])
-        bookings_table = get_table(application.config['DYNAMO_DB_BOOKINGS_TABLE'])
-
-        # Fetch turfs managed by the current manager
-        response = turfs_table.scan(
-            FilterExpression="manager_id = :m_id",
-            ExpressionAttributeValues={":m_id": session['user_id']}
-        )
-        turfs = response.get('Items', [])
-
+        turfs = Turf.query.filter_by(manager_id=session['user_id']).all()
         for turf in turfs:
-            turf['time_slots_list'] = turf.get('time_slots', '').split(',') if turf.get('time_slots') else []
+            # Split the time_slots string into a list
+            turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
 
-            # Fetch bookings for the current turf
-            bookings_response = bookings_table.scan(
-                FilterExpression="turf_id = :t AND #st <> :d",
-                ExpressionAttributeNames={"#st": "status"},  # Alias for reserved keyword
-                ExpressionAttributeValues={
-                    ":t": turf['id'],
-                    ":d": "Deleted"
-                }
-            )
-            bookings = bookings_response.get('Items', [])
+            # Fetch valid bookings for this turf
+            turf.bookings = Booking.query.filter_by(turf_id=turf.id).all()
 
             # Attach user details to bookings
-            for booking in bookings:
-                user = get_item(application.config['DYNAMO_DB_USERS_TABLE'], {'id': booking['user_id']})
-                booking['user'] = user
+            for booking in turf.bookings:
+                booking.user = User.query.get(booking.user_id)  # Fetch and attach user details
 
             # Mark booked slots
-            turf['booked_slots'] = [
-                booking['time_slot'] for booking in bookings if booking['status'] == 'Accepted'
+            turf.booked_slots = [
+                booking.time_slot for booking in turf.bookings if booking.status == 'Accepted'
             ]
-            turf['bookings'] = bookings
 
         return render_template('view_turfs.html', turfs=turfs)
     return redirect(url_for('login'))
 
-@application.route('/manager/edit_turf/<turf_id>', methods=['GET', 'POST'])
+# Route to serve the image from the database
+@application.route('/turf_image/<int:turf_id>')
+def turf_image(turf_id):
+    turf = Turf.query.get(turf_id)
+    if turf and turf.photo_data:
+        return send_file(
+            io.BytesIO(turf.photo_data),
+            mimetype='image/jpeg',  # Adjust MIME type based on your images
+            as_attachment=False,
+            download_name=turf.photo_name
+        )
+    return 'No image available', 404
+
+@application.route('/manager/edit_turf/<int:turf_id>', methods=['GET', 'POST'])
 def edit_turf(turf_id):
     if 'user_id' in session and session.get('role') == 'manager':
-        turfs_table = get_table(application.config['DYNAMO_DB_TURFS_TABLE'])
-        turf = get_item(application.config['DYNAMO_DB_TURFS_TABLE'], {'id': turf_id})
+        turf = Turf.query.get(turf_id)
 
-        if not turf or turf['manager_id'] != session['user_id']:
+        if not turf or turf.manager_id != session['user_id']:
             flash('Unauthorized access or Turf not found.')
             return redirect(url_for('view_turfs'))
 
         if request.method == 'POST':
-            name = request.form['name']
-            location = request.form['location']
-            price = request.form['price']
-            time_slots = ','.join(request.form.getlist('custom_slots[]'))
+            turf.name = request.form['name']
+            turf.location = request.form['location']
+            turf.price = request.form['price']
+            # Convert the time_slots to a comma-separated string
 
-            # Handle photo upload
             photo = request.files['photo']
-            if photo:
-                s3_url = upload_file_to_s3(photo, application.config['AWS_S3_BUCKET'])
-                if s3_url:
-                    turf['photo'] = s3_url
 
-            # Update turf fields
-            turf.update({
-                'name': name,
-                'location': location,
-                'price': float(price),
-                'time_slots': time_slots
-            })
-            put_item(application.config['DYNAMO_DB_TURFS_TABLE'], turf)
+            if photo:
+                filename = secure_filename(photo.filename)
+                photo_path = os.path.join(application.config['UPLOAD_FOLDER'], filename)
+                photo.save(photo_path)
+                turf.photo = filename  # Update the photo if provided
+
+            db.session.commit()
             flash('Turf updated successfully!')
             return redirect(url_for('view_turfs'))
 
-        time_slots_list = turf['time_slots'].split(',') if 'time_slots' in turf else []
+        # Prepare time_slots as a list for rendering in the form
+        time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
         return render_template('edit_turf.html', turf=turf, time_slots_list=time_slots_list)
-    return redirect(url_for('login'))
-
+    else:
+        return redirect(url_for('login'))
 
 @application.route('/manager/delete_turf', methods=['POST'])
 def delete_turf():
     if 'user_id' in session and session['role'] == 'manager':
         turf_id = request.form['turf_id']
-        turfs_table = get_table(application.config['DYNAMO_DB_TURFS_TABLE'])
-        bookings_table = get_table(application.config['DYNAMO_DB_BOOKINGS_TABLE'])
-
-        turf = get_item(application.config['DYNAMO_DB_TURFS_TABLE'], {'id': turf_id})
-        if turf and turf['manager_id'] == session['user_id']:
-            try:
-                # Delete related bookings
-                bookings_response = bookings_table.scan(FilterExpression="turf_id = :t",
-                                                        ExpressionAttributeValues={":t": turf_id})
-                for booking in bookings_response['Items']:
-                    bookings_table.delete_item(Key={'id': booking['id']})
-
-                # Delete turf
-                turfs_table.delete_item(Key={'id': turf_id})
-                flash('Turf and its bookings deleted successfully.')
-            except Exception as e:
-                flash(f'Error deleting turf: {str(e)}')
+        turf = Turf.query.get(turf_id)
+        if turf and turf.manager_id == session['user_id']:
+            db.session.delete(turf)
+            db.session.commit()
+            flash('Turf and its bookings deleted successfully.')
         else:
             flash('Unauthorized action or Turf not found.')
     return redirect(url_for('manager_dashboard'))
@@ -489,15 +325,13 @@ def delete_turf():
 def accept_booking():
     if 'user_id' in session and session.get('role') == 'manager':
         booking_id = request.form['booking_id']
-        bookings_table = get_table(application.config['DYNAMO_DB_BOOKINGS_TABLE'])
-        turfs_table = get_table(application.config['DYNAMO_DB_TURFS_TABLE'])
-
-        booking = get_item(application.config['DYNAMO_DB_BOOKINGS_TABLE'], {'id': booking_id})
+        booking = Booking.query.get(booking_id)
         if booking:
-            turf = get_item(application.config['DYNAMO_DB_TURFS_TABLE'], {'id': booking['turf_id']})
-            if turf and turf['manager_id'] == session['user_id']:
-                booking['status'] = 'Accepted'
-                put_item(application.config['DYNAMO_DB_BOOKINGS_TABLE'], booking)
+            # Check if the booking belongs to a turf managed by the current manager
+            turf = Turf.query.get(booking.turf_id)
+            if turf and turf.manager_id == session['user_id']:
+                booking.status = 'Accepted'
+                db.session.commit()
                 flash('Booking accepted successfully!')
             else:
                 flash('Unauthorized action.')
@@ -510,120 +344,83 @@ def accept_booking():
 @application.route('/user', methods=['GET', 'POST'])
 def user_dashboard():
     if 'role' in session and session['role'] == 'user':
-        turfs_table = get_table(application.config['DYNAMO_DB_TURFS_TABLE'])
-        bookings_table = get_table(application.config['DYNAMO_DB_BOOKINGS_TABLE'])
-
-        # Fetch all turfs
-        response = turfs_table.scan()
-        turfs = response['Items']
-
+        turfs = Turf.query.all()
         for turf in turfs:
-            # Parse time slots into a list
-            turf['time_slots_list'] = turf['time_slots'].split(',') if 'time_slots' in turf else []
-
-            # Fetch accepted bookings for this turf
-            bookings_response = bookings_table.scan(
-                FilterExpression="turf_id = :t AND #st = :s",
-                ExpressionAttributeNames={"#st": "status"},  # Alias for reserved keyword
-                ExpressionAttributeValues={":t": turf['id'], ":s": "Accepted"}
-            )
-            accepted_bookings = bookings_response['Items']
-            turf['booked_slots'] = [b['time_slot'] for b in accepted_bookings]
+            turf.time_slots_list = turf.time_slots.split(',')
+            bookings = Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
+            turf.booked_slots = [b.time_slot for b in bookings]
 
         if request.method == 'POST':
             turf_id = request.form['turf_id']
             time_slot = request.form['time_slot']
-
-            # Check if the time slot is already booked
-            booked_slots = [
-                b['time_slot'] for b in bookings_table.scan(
-                    FilterExpression="turf_id = :t AND #st = :s",
-                    ExpressionAttributeNames={"#st": "status"},  # Alias for reserved keyword
-                    ExpressionAttributeValues={":t": turf_id, ":s": "Accepted"}
-                )['Items']
-            ]
+            booked_slots = [b.time_slot for b in Booking.query.filter_by(turf_id=turf_id, status='Accepted').all()]
             if time_slot in booked_slots:
                 flash('Slot already booked. Choose another slot.')
             else:
-                # Create a new booking
-                booking_id = str(uuid.uuid4())
-                put_item(application.config['DYNAMO_DB_BOOKINGS_TABLE'], {
-                    'id': booking_id,
-                    'turf_id': turf_id,
-                    'user_id': session['user_id'],
-                    'time_slot': time_slot,
-                    'status': 'Pending'
-                })
+                booking = Booking(turf_id=turf_id, user_id=session['user_id'], time_slot=time_slot, status='Pending')
+                db.session.add(booking)
+                db.session.commit()
                 flash('Booking submitted!')
-
         return render_template('user_dashboard.html', turfs=turfs)
     return redirect(url_for('login'))
-
 
 @application.route('/user/book_turf', methods=['POST'])
 def book_turf():
     if 'user_id' in session:
         turf_id = request.form['turf_id']
         time_slot = request.form['time_slot']
-        booking_id = str(uuid.uuid4())  # Generate a unique ID for the booking
-
-        # Add booking to the DynamoDB table
-        put_item(application.config['DYNAMO_DB_BOOKINGS_TABLE'], {
-            'id': booking_id,
-            'turf_id': turf_id,
-            'user_id': session['user_id'],
-            'time_slot': time_slot,
-            'status': 'Pending'
-        })
-
+        booking = Booking(
+            turf_id=turf_id,
+            user_id=session['user_id'],
+            time_slot=time_slot,
+            status='Pending'
+        )
+        db.session.add(booking)
+        db.session.commit()
         flash('Booking request submitted!')
         return redirect(url_for('user_dashboard'))
-    return redirect(url_for('login'))
+    else:
+        return redirect(url_for('login'))
 
 
 @application.route('/history', methods=['GET'])
 def booking_history():
     if 'user_id' in session:
-        bookings_table = get_table(application.config['DYNAMO_DB_BOOKINGS_TABLE'])
-        turfs_table = get_table(application.config['DYNAMO_DB_TURFS_TABLE'])
-
-        # Fetch bookings for the logged-in user
-        response = bookings_table.scan(FilterExpression="user_id = :u", ExpressionAttributeValues={":u": session['user_id']})
-        bookings = response['Items']
-
+        bookings = Booking.query.filter_by(user_id=session['user_id']).all()
         for booking in bookings:
-            # Fetch turf details for each booking
-            turf = get_item(application.config['DYNAMO_DB_TURFS_TABLE'], {'id': booking['turf_id']})
-            if turf:
-                booking['turf_name'] = turf['name']
-                booking['price'] = turf['price']
-
+            # Fetch additional details about the turf
+            turf = Turf.query.get(booking.turf_id)
+            booking.turf_name = turf.name
+            booking.price = turf.price
         return render_template('booking_history.html', bookings=bookings)
-    return redirect(url_for('login'))
-
+    else:
+        return redirect(url_for('login'))
 
 @application.route('/delete_booking', methods=['POST'])
 def delete_booking():
     if 'user_id' in session and session['role'] == 'user':
         booking_id = request.form['booking_id']
-        bookings_table = get_table(application.config['DYNAMO_DB_BOOKINGS_TABLE'])
+        booking = Booking.query.get(booking_id)
 
-        # Fetch the booking to verify ownership
-        booking = get_item(application.config['DYNAMO_DB_BOOKINGS_TABLE'], {'id': booking_id})
-        if booking and booking['user_id'] == session['user_id']:
-            try:
-                bookings_table.delete_item(Key={'id': booking_id})
-                flash('Booking deleted successfully.')
-            except Exception as e:
-                flash(f'Error deleting booking: {str(e)}')
+        if booking and booking.user_id == session['user_id']:
+            db.session.delete(booking)
+            db.session.commit()
+            flash('Booking deleted successfully.')
         else:
             flash('Unauthorized action or booking not found.')
 
     return redirect(url_for('booking_history'))
+    
+@application.route('/debug')
+def debug():
+    turfs = Turf.query.all()
+    return {turf.id: turf.photo for turf in turfs}
+    
+
+
 
 if __name__ == '__main__':
-    # Initialize DynamoDB tables at application startup
-    initialize_dynamo_tables()
-    
-    # Run the Flask application
-    application.run(debug=True, host='0.0.0.0', port=8080)
+    with application.app_context():
+        db.create_all()  # Ensure the database tables are created within the application context.
+    application.run(debug=True,host='0.0.0.0',port=8080)
+# Paste the revised application.py here (already provided earlier)

@@ -202,7 +202,7 @@
 <div class="container">
     {% for turf in turfs %}
     <div class="turf-card">
-        <img src="{{ turf.photo }}" alt="{{ turf.name }}" style="width: 100%; height: auto;">
+        <img src="{{ url_for('turf_image', turf_id=turf.id) }}" alt="{{ turf.name }}" style="width: 100%; height: auto;">
         <div class="details">
             <h3>{{ turf.name }}</h3>
             <p><strong>Location:</strong> {{ turf.location }}</p>

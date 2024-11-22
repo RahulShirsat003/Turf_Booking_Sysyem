@@ -70,15 +70,15 @@
 
         .turf-photo {
             flex: 1;
-            max-width: 200px;
+            max-width: 250px; /* Adjust to accommodate the larger image size */
             border-radius: 8px;
             overflow: hidden;
         }
 
         .turf-photo img {
             width: 100%;
-            height: auto;
-            object-fit: cover;
+            height: 250px; /* Increase the height */
+            object-fit: cover; /* Ensure the image scales properly */
         }
 
         .turf-details {
@@ -128,7 +128,7 @@
         {% for turf in turfs %}
         <div class="turf-card">
             <div class="turf-photo">
-                <img src="{{ turf.photo }}" alt="{{ turf.name }}" style="width: 100%; height: auto;">
+                <img src="{{ url_for('turf_image', turf_id=turf.id) }}" alt="{{ turf.name }}">
             </div>
             <div class="turf-details">
                 <h3>{{ turf.name }}</h3>

@@ -135,10 +135,10 @@
                 input.type = 'hidden';
                 input.name = 'custom_slots[]';
                 input.value = newSlot;
-                li.appendChild(input);
+                li.applicationendChild(input);
 
-                // Append to the list and clear the input
-                slotList.appendChild(li);
+                // applicationend to the list and clear the input
+                slotList.applicationendChild(li);
                 slotInput.value = '';
             } else {
                 alert('Please enter a valid time slot.');
