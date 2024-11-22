@@ -30,7 +30,3 @@ artifacts:
     - '**/*'  # Include all files in the output artifact
   discard-paths: no  # Keep the directory structure
 
-env:
-  variables:
-    FLASK_APP: "app.py"
-    FLASK_ENV: "development"
