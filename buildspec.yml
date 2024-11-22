@@ -1,0 +1,36 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9  # Specify Python version
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --upgrade pip
+      - pip install -r requirements.txt pylint boto3 flask_sqlalchemy  # Install app dependencies and linting tools
+
+  pre_build:
+    commands:
+      - echo "Running pre-build checks..."
+      - python --version  # Confirm Python version
+      - pylint $CODEBUILD_SRC_DIR/*.py || true  # Static analysis for top-level Python files
+      - echo "Pre-build checks completed."
+
+  build:
+    commands:
+      - echo "Building the application..."
+      - python app.py &  # Start the Flask app for testing purposes (if necessary)
+
+  post_build:
+    commands:
+      - echo "Post-build phase completed."
+      
+artifacts:
+  files:
+    - '**/*'  # Include all files in the output artifact
+  discard-paths: no  # Keep the directory structure
+
+env:
+  variables:
+    FLASK_APP: "app.py"
+    FLASK_ENV: "development"
