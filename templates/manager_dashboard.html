@@ -126,19 +126,19 @@
             const newSlot = slotInput.value.trim();
 
             if (newSlot) {
-                // Create list item for the slot
+                // Create a new list item for the slot
                 const li = document.createElement('li');
                 li.textContent = newSlot;
 
-                // Add hidden input to submit this slot with the form
+                // Create a hidden input field for form submission
                 const input = document.createElement('input');
                 input.type = 'hidden';
-                input.name = 'custom_slots[]';
+                input.name = 'time_slots[]';
                 input.value = newSlot;
-                li.applicationendChild(input);
+                li.appendChild(input);
 
-                // applicationend to the list and clear the input
-                slotList.applicationendChild(li);
+                // Append the list item and clear the input
+                slotList.appendChild(li);
                 slotInput.value = '';
             } else {
                 alert('Please enter a valid time slot.');

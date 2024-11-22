@@ -63,23 +63,29 @@ def login():
         password = request.form['password']
         role = request.form['role']
 
-        # Handle Admin Login
+        # Admin Login
         if role == "admin":
             if username == admin_username and password == admin_password:
                 session['role'] = 'admin'
+                session['user_id'] = 0  # No specific ID for admin
+                flash('Logged in as Admin.')
                 return redirect(url_for('admin_dashboard'))
             else:
                 flash('Invalid Admin credentials!')
 
-        # Handle Turf Manager and User Login
+        # Manager/User Login
         else:
-            user = User.query.filter_by(username=username, password=password).first()
-            if user and user.role == role:
+            user = User.query.filter_by(username=username, password=password, role=role).first()
+            if user:
+                # Store session data for the logged-in user
                 session['user_id'] = user.id
                 session['role'] = user.role
-                if role == 'manager':
+
+                # Redirect to appropriate dashboard based on role
+                flash(f"Logged in as {role.capitalize()}.")
+                if role == "manager":
                     return redirect(url_for('manager_dashboard'))
-                elif role == 'user':
+                elif role == "user":
                     return redirect(url_for('user_dashboard'))
             else:
                 flash('Invalid credentials or role selection!')
@@ -204,44 +210,68 @@ def delete_manager():
 
 @application.route('/manager_dashboard', methods=['GET', 'POST'])
 def manager_dashboard():
-    if 'user_id' in session and session['role'] == 'manager':
-        if request.method == 'POST':
-            name = request.form['name']
-            location = request.form['location']
-            price = request.form['price']
-            photo = request.files['photo']
+    if session.get('role') != 'manager':
+        return redirect(url_for('login'))
 
-            # Combine custom slots into a comma-separated string
-            custom_slots = request.form.getlist('custom_slots[]')
-            time_slots = ','.join(custom_slots)
+    if request.method == 'POST':
+        name = request.form['name']
+        location = request.form['location']
+        price = float(request.form['price'])
+        photo = request.files['photo']
+        time_slots = request.form.getlist('time_slots[]')  # Fetch list of time slots
 
-            if photo:
-                filename = secure_filename(photo.filename)
-                photo_data = photo.read()  # Read binary data of the image
+        print(f"Form Data: Name={name}, Location={location}, Price={price}, Time Slots={time_slots}")
 
-                # Create a new Turf entry
-                turf = Turf(
-                    name=name,
-                    location=location,
-                    price=float(price),
-                    time_slots=time_slots,
-                    photo_data=photo_data,  # Store binary data
-                    photo_name=filename,    # Store file name
-                    manager_id=session['user_id']
-                )
-                db.session.add(turf)
-                db.session.commit()
-                flash('Turf added successfully!')
+        if not time_slots:
+            flash('Please add at least one time slot.')
+            return redirect(url_for('manager_dashboard'))
 
-        turfs = Turf.query.filter_by(manager_id=session['user_id']).all()
-        return render_template('manager_dashboard.html', turfs=turfs)
-    return redirect(url_for('login'))
+        # Combine time slots into a comma-separated string
+        time_slots_str = ','.join(time_slots)
 
+        # Process photo data
+        photo_data = photo.read()
+        photo_name = secure_filename(photo.filename)
+
+        # Add new turf
+        turf = Turf(
+            name=name,
+            location=location,
+            price=price,
+            time_slots=time_slots_str,  # Save time slots as a single string
+            photo_data=photo_data,
+            photo_name=photo_name,
+            manager_id=session['user_id']
+        )
+        db.session.add(turf)
+        db.session.commit()
+        flash('Turf added successfully!')
+
+    turfs = Turf.query.filter_by(manager_id=session['user_id']).all()
+    print(f"Manager ID: {session['user_id']}, Turfs Count: {len(turfs)}")
+    return render_template('manager_dashboard.html', turfs=turfs)
+    
+    
+# Route to serve the image from the database
+@application.route('/turf_image/<int:turf_id>')
+def turf_image(turf_id):
+    turf = Turf.query.get(turf_id)
+    if turf and turf.photo_data:
+        return send_file(
+            io.BytesIO(turf.photo_data),
+            mimetype='image/jpeg',  # Adjust MIME type based on your images
+            as_attachment=False,
+            download_name=turf.photo_name
+        )
+    return 'No image available', 404
+    
 
 @application.route('/view_turfs', methods=['GET'])
 def view_turfs():
     if 'user_id' in session and session.get('role') == 'manager':
+        # Fetch turfs for the logged-in manager
         turfs = Turf.query.filter_by(manager_id=session['user_id']).all()
+
         for turf in turfs:
             # Split the time_slots string into a list
             turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
@@ -260,19 +290,18 @@ def view_turfs():
 
         return render_template('view_turfs.html', turfs=turfs)
     return redirect(url_for('login'))
+    
+    
+@application.route('/debug_turfs')
+def debug_turfs():
+    turfs = Turf.query.all()
+    return {turf.id: {
+        "name": turf.name,
+        "manager_id": turf.manager_id,
+        "time_slots": turf.time_slots
+    } for turf in turfs}
 
-# Route to serve the image from the database
-@application.route('/turf_image/<int:turf_id>')
-def turf_image(turf_id):
-    turf = Turf.query.get(turf_id)
-    if turf and turf.photo_data:
-        return send_file(
-            io.BytesIO(turf.photo_data),
-            mimetype='image/jpeg',  # Adjust MIME type based on your images
-            as_attachment=False,
-            download_name=turf.photo_name
-        )
-    return 'No image available', 404
+
 
 @application.route('/manager/edit_turf/<int:turf_id>', methods=['GET', 'POST'])
 def edit_turf(turf_id):
@@ -341,28 +370,41 @@ def accept_booking():
     return redirect(url_for('login'))
 
 
-@application.route('/user', methods=['GET', 'POST'])
+@application.route('/user_dashboard', methods=['GET', 'POST'])
 def user_dashboard():
-    if 'role' in session and session['role'] == 'user':
-        turfs = Turf.query.all()
-        for turf in turfs:
-            turf.time_slots_list = turf.time_slots.split(',')
-            bookings = Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
-            turf.booked_slots = [b.time_slot for b in bookings]
+    if session.get('role') != 'user':
+        return redirect(url_for('login'))
 
-        if request.method == 'POST':
-            turf_id = request.form['turf_id']
-            time_slot = request.form['time_slot']
-            booked_slots = [b.time_slot for b in Booking.query.filter_by(turf_id=turf_id, status='Accepted').all()]
-            if time_slot in booked_slots:
-                flash('Slot already booked. Choose another slot.')
-            else:
-                booking = Booking(turf_id=turf_id, user_id=session['user_id'], time_slot=time_slot, status='Pending')
-                db.session.add(booking)
-                db.session.commit()
-                flash('Booking submitted!')
-        return render_template('user_dashboard.html', turfs=turfs)
-    return redirect(url_for('login'))
+    turfs = Turf.query.all()
+    for turf in turfs:
+        # Convert comma-separated time slots to a list
+        turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
+
+        # Get booked slots for this turf
+        bookings = Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
+        turf.booked_slots = [b.time_slot for b in bookings]
+
+    if request.method == 'POST':
+        turf_id = int(request.form['turf_id'])
+        time_slot = request.form['time_slot']
+
+        # Ensure the selected slot is not already booked
+        existing_booking = Booking.query.filter_by(turf_id=turf_id, time_slot=time_slot, status='Accepted').first()
+        if existing_booking:
+            flash("This slot is already booked!")
+        else:
+            # Create a new booking
+            booking = Booking(
+                turf_id=turf_id,
+                user_id=session['user_id'],
+                time_slot=time_slot
+            )
+            db.session.add(booking)
+            db.session.commit()
+            flash("Booking request submitted!")
+
+    return render_template('user_dashboard.html', turfs=turfs)
+    
 
 @application.route('/user/book_turf', methods=['POST'])
 def book_turf():
@@ -415,6 +457,7 @@ def delete_booking():
 def debug():
     turfs = Turf.query.all()
     return {turf.id: turf.photo for turf in turfs}
+
     
 
 
