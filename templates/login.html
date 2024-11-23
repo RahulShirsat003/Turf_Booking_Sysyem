@@ -9,7 +9,7 @@
             font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #1a1a2e, #e94560);
+            background: linear-gradient(135deg, #003d5b, #00a8e8);
             color: #fff;
             display: flex;
             flex-direction: column;
@@ -19,7 +19,7 @@
 
         nav {
             width: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
+            background-color: rgba(0, 0, 0, 0.8);
             padding: 1rem;
             position: fixed;
             top: 0;
@@ -28,17 +28,22 @@
             justify-content: center;
             gap: 1rem;
             z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
         }
 
         nav a {
-            color: #fff;
+            color: #ffffff;
             text-decoration: none;
             font-size: 1.2rem;
-            transition: color 0.3s;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         nav a:hover {
-            color: #e94560;
+            background-color: #00a8e8;
+            color: #003d5b;
         }
 
         .container {

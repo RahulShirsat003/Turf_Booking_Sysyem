@@ -436,7 +436,7 @@ def booking_history():
             booking.price = turf.price
         return render_template('booking_history.html', bookings=bookings)
     else:
-        return redirect(url_for('login'))
+        return redirect(url_for('user_dashboard.html'))
 
 @application.route('/delete_booking', methods=['POST'])
 def delete_booking():
