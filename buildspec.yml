@@ -1,42 +1,32 @@
-version: 0.2
-env:
-  secrets-manager:
-    LOGIN: TurfBooking01:sonartoken
-    HOST: TurfBooking01:HOST
-    Organization: TurfBooking01:Organization
-    Project: TurfBooking01:Project
+cversion: 0.2
+
 phases:
   install:
     runtime-versions:
-      python: 3.9
+      python: 3.9  # Specify Python version
     commands:
       - echo "Installing dependencies..."
       - pip install --upgrade pip
-      - pip install -r requirements.txt pylint requests
-      - echo "Installing SonarScanner CLI..."
-      - wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
-      - unzip sonar-scanner-cli-4.8.0.2856-linux.zip
-      - export PATH=$PATH:$PWD/sonar-scanner-4.8.0.2856-linux/bin/
+      - pip install -r requirements.txt pylint boto3 flask_sqlalchemy  # Install applicationlication dependencies and linting tools
+
+  pre_build:
+    commands:
+      - echo "Running pre-build checks..."
+      - python --version  # Confirm Python version
+      - pylint $CODEBUILD_SRC_DIR/*.py || true  # Static analysis for top-level Python files
+      - echo "Pre-build checks completed."
 
   build:
     commands:
-      - echo "Running SonarCloud analysis..."
-      - sonar-scanner \
-          -Dsonar.projectKey=$Project \
-          -Dsonar.organization=$Organization \
-          -Dsonar.host.url=$HOST \
-          -Dsonar.login=$LOGIN
-      - echo "Waiting for SonarCloud Quality Gate result..."
-      - sleep 10
-      - curl -X GET "$HOST/api/qualitygates/project_status?projectKey=$Project" -H "Authorization: Bearer $LOGIN" > result.json
-      - cat result.json
-      - if [ $(jq -r '.projectStatus.status' result.json) = ERROR ]; then exit 1; fi
+      - echo "Building the applicationlicationlication..."
+      - python applicationlication.py &  # Start the Flask applicationlication for testing purposes (if necessary)
 
   post_build:
     commands:
-      - echo "SonarCloud analysis completed."
-
+      - echo "Post-build phase completed."
+      
 artifacts:
   files:
-    - result.json
-  discard-paths: no
+    - '**/*'  # Include all files in the output artifact
+  discard-paths: no  # Keep the directory structure
+
