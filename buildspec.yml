@@ -1,4 +1,4 @@
-cversion: 0.2
+version: 0.2
 
 phases:
   install:
@@ -7,26 +7,24 @@ phases:
     commands:
       - echo "Installing dependencies..."
       - pip install --upgrade pip
-      - pip install -r requirements.txt pylint boto3 flask_sqlalchemy  # Install applicationlication dependencies and linting tools
+      - pip install -r requirements.txt pylint boto3 flask_sqlalchemy
 
   pre_build:
     commands:
       - echo "Running pre-build checks..."
       - python --version  # Confirm Python version
-      - pylint $CODEBUILD_SRC_DIR/*.py || true  # Static analysis for top-level Python files
-      - echo "Pre-build checks completed."
+      - pylint $CODEBUILD_SRC_DIR/*.py || true  # Static analysis
 
   build:
     commands:
-      - echo "Building the applicationlicationlication..."
-      - python applicationlication.py &  # Start the Flask applicationlication for testing purposes (if necessary)
+      - echo "Building the application..."
+      - python -m unittest discover tests  # Run unit tests
 
   post_build:
     commands:
-      - echo "Post-build phase completed."
-      
+      - echo "Post-build tasks completed."
+
 artifacts:
   files:
-    - '**/*'  # Include all files in the output artifact
-  discard-paths: no  # Keep the directory structure
-
+    - '**/*'
+  discard-paths: no
