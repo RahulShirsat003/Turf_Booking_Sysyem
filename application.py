@@ -55,8 +55,13 @@ def home():
 
 @application.route('/login', methods=['GET', 'POST'])
 def login():
-    admin_username = "admin"
-    admin_password = "admin123"
+    # Retrieve admin credentials from environment variables
+    admin_username = os.getenv("ADMIN_USERNAME")
+    admin_password = os.getenv("ADMIN_PASSWORD")
+
+    # Check if admin credentials are set
+    if not admin_username or not admin_password:
+        raise ValueError("Admin username or password environment variables are not set")
 
     if request.method == 'POST':
         username = request.form['username']
@@ -72,16 +77,13 @@ def login():
                 return redirect(url_for('admin_dashboard'))
             else:
                 flash('Invalid Admin credentials!')
-
+        
         # Manager/User Login
         else:
             user = User.query.filter_by(username=username, password=password, role=role).first()
             if user:
-                # Store session data for the logged-in user
                 session['user_id'] = user.id
                 session['role'] = user.role
-
-                # Redirect to appropriate dashboard based on role
                 flash(f"Logged in as {role.capitalize()}.")
                 if role == "manager":
                     return redirect(url_for('manager_dashboard'))
