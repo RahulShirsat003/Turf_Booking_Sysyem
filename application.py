@@ -501,64 +501,84 @@ def accept_booking():
 @application.route('/user_dashboard', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")  # Limit user dashboard access to 10 requests per minute
 def user_dashboard():
-    def process_turfs():
-        """Retrieve and process turfs for rendering."""
-        turfs = Turf.query.all()
-        for turf in turfs:
-            turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
-            turf.booked_slots = [
-                b.time_slot for b in Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
-            ]
-        return turfs
-
-    def create_booking(turf_id, time_slot):
-        """Create a new booking for the user."""
-        turf = Turf.query.get(turf_id)
-        if not turf:
-            flash("Invalid turf selection.")
-            return False
-
-        existing_booking = Booking.query.filter_by(
-            turf_id=turf_id, time_slot=time_slot, status='Accepted'
-        ).first()
-        if existing_booking:
-            flash("This slot is already booked!")
-            return False
-
-        booking = Booking(
-            turf_id=turf_id,
-            user_id=session['user_id'],
-            time_slot=time_slot
-        )
-        db.session.add(booking)
-        db.session.commit()
-        flash("Booking request submitted successfully!")
-        return True
-
     if session.get('role') != 'user':
         flash("Unauthorized access. Please log in as a user.")
         return redirect(url_for('login'))
 
     if request.method == 'GET':
-        turfs = process_turfs()
-        return render_template('user_dashboard.html', turfs=turfs)
+        return render_user_dashboard()
 
     if request.method == 'POST':
-        try:
-            turf_id = int(request.form.get('turf_id', '').strip())
-            time_slot = escape(request.form.get('time_slot', '').strip())
+        return process_booking_request()
 
-            if not create_booking(turf_id, time_slot):
-                return redirect(url_for('user_dashboard'))
+    return "Method Not Allowed", 405
 
-        except ValueError:
-            flash("Invalid input. Please select a valid turf and time slot.")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Error processing booking: {str(e)}")
 
-        return redirect(url_for('user_dashboard'))
+def render_user_dashboard():
+    """Retrieve and render turfs for the user dashboard."""
+    turfs = Turf.query.all()
 
+    # Process turfs to include available and booked slots
+    for turf in turfs:
+        turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
+        turf.booked_slots = [
+            b.time_slot for b in Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
+        ]
+
+    return render_template('user_dashboard.html', turfs=turfs)
+
+
+def process_booking_request():
+    """Handle booking requests from the user."""
+    try:
+        turf_id = validate_and_get_turf_id(request.form.get('turf_id', '').strip())
+        time_slot = escape(request.form.get('time_slot', '').strip())
+        if not validate_and_create_booking(turf_id, time_slot):
+            return redirect(url_for('user_dashboard'))
+    except ValueError:
+        flash("Invalid input. Please select a valid turf and time slot.")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error processing booking: {str(e)}")
+    return redirect(url_for('user_dashboard'))
+
+
+def validate_and_get_turf_id(turf_id):
+    """Validate and parse the turf ID."""
+    try:
+        return int(turf_id)
+    except ValueError:
+        raise ValueError("Invalid turf ID")
+
+
+def validate_and_create_booking(turf_id, time_slot):
+    """Validate the booking and create it if valid."""
+    turf = Turf.query.get(turf_id)
+    if not turf:
+        flash("Invalid turf selection.")
+        return False
+
+    existing_booking = Booking.query.filter_by(
+        turf_id=turf_id, time_slot=time_slot, status='Accepted'
+    ).first()
+    if existing_booking:
+        flash("This slot is already booked!")
+        return False
+
+    create_booking(turf_id, time_slot)
+    return True
+
+
+def create_booking(turf_id, time_slot):
+    """Create a new booking."""
+    booking = Booking(
+        turf_id=turf_id,
+        user_id=session['user_id'],
+        time_slot=time_slot
+    )
+    db.session.add(booking)
+    db.session.commit()
+    flash("Booking request submitted successfully!")
     
 
 @application.route('/user/book_turf', methods=['POST'])
