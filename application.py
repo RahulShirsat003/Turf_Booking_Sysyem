@@ -54,30 +54,6 @@ def home():
     return render_template('home.html')
     
     
-def get_admin_credentials():
-    secret_name = "admin/credentials"  # Replace with your secret name
-    region_name = "eu-west-1"  
-    # Create a Secrets Manager client
-    client = boto3.client("secretsmanager", region_name=region_name)
-    try:
-        response = client.get_secret_value(SecretId=secret_name)
-        secret = json.loads(response["SecretString"])
-        return secret
-    except ClientError as e:
-        # Handles specific errors from AWS Secrets Manager
-        raise Exception(f"Secrets Manager client error: {e.response['Error']['Message']}")
-    except json.JSONDecodeError as e:
-        # Handles JSON parsing errors
-        raise Exception(f"Error decoding JSON response from Secrets Manager: {str(e)}")
-    except NoCredentialsError:
-        # Handles missing AWS credentials
-        raise Exception("AWS credentials not found")
-    except PartialCredentialsError as e:
-        # Handles incomplete AWS credentials
-        raise Exception(f"Incomplete AWS credentials: {str(e)}")
-    except Exception as e:
-        # Catch-all for unexpected exceptions
-        raise Exception(f"Unexpected error: {str(e)}")
 
 @application.route('/login', methods=['GET', 'POST'])
 def login():
@@ -481,6 +457,15 @@ def debug():
     
 
 if __name__ == '__main__':
+    # Ensure the database is initialized
     with application.app_context():
-        db.create_all()  
-    application.run(debug=True,host='0.0.0.0',port=8080)
+        db.create_all()
+
+    # Use environment variables to manage configurations
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
+    port = int(os.getenv("FLASK_PORT", "8080"))
+
+    # Run the application with debug mode disabled by default
+    application.run(debug=debug_mode, host=host, port=port)
+
