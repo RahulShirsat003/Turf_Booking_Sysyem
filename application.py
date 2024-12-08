@@ -406,6 +406,16 @@ def debug_turfs():
 @csrf.exempt  # Remove this line if enabling CSRF protection
 @limiter.limit("5 per minute")  # Limit editing attempts to 5 per minute
 def edit_turf(turf_id):
+    def validate_price(price):
+        """Validate the price input."""
+        try:
+            price = float(price)
+            if price <= 0:
+                raise ValueError("Price must be positive.")
+            return price
+        except ValueError:
+            return None
+
     # Ensure the user is logged in and is a manager
     if 'user_id' not in session or session.get('role') != 'manager':
         flash("Unauthorized access. Please log in as a manager.")
@@ -422,39 +432,35 @@ def edit_turf(turf_id):
         time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
         return render_template('edit_turf.html', turf=turf, time_slots_list=time_slots_list)
 
-    elif request.method == 'POST':
-        try:
-            # Validate and sanitize inputs
-            turf.name = escape(request.form.get('name', '').strip())
-            turf.location = escape(request.form.get('location', '').strip())
-            price = request.form.get('price', '').strip()
+    # Handle POST request
+    try:
+        # Validate and sanitize inputs
+        turf.name = escape(request.form.get('name', '').strip())
+        turf.location = escape(request.form.get('location', '').strip())
 
-            # Validate price
-            try:
-                turf.price = float(price)
-                if turf.price <= 0:
-                    raise ValueError("Price must be positive.")
-            except ValueError:
-                flash('Invalid price. Please enter a positive number.')
-                return redirect(url_for('edit_turf', turf_id=turf_id))
-
-            # Handle photo upload
-            photo = request.files.get('photo')
-            if photo:
-                filename = secure_filename(photo.filename)
-                photo_data = photo.read()
-                turf.photo_data = photo_data
-                turf.photo_name = filename
-
-            # Save changes to the database
-            db.session.commit()
-            flash('Turf updated successfully!')
-            return redirect(url_for('view_turfs'))
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Error updating turf: {str(e)}")
+        # Validate and update price
+        price = validate_price(request.form.get('price', '').strip())
+        if price is None:
+            flash('Invalid price. Please enter a positive number.')
             return redirect(url_for('edit_turf', turf_id=turf_id))
+        turf.price = price
+
+        # Handle photo upload
+        photo = request.files.get('photo')
+        if photo:
+            filename = secure_filename(photo.filename)
+            turf.photo_data = photo.read()
+            turf.photo_name = filename
+
+        # Save changes to the database
+        db.session.commit()
+        flash('Turf updated successfully!')
+        return redirect(url_for('view_turfs'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error updating turf: {str(e)}")
+        return redirect(url_for('edit_turf', turf_id=turf_id))
 
    
 
@@ -495,53 +501,55 @@ def accept_booking():
 @application.route('/user_dashboard', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")  # Limit user dashboard access to 10 requests per minute
 def user_dashboard():
+    def process_turfs():
+        """Retrieve and process turfs for rendering."""
+        turfs = Turf.query.all()
+        for turf in turfs:
+            turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
+            turf.booked_slots = [
+                b.time_slot for b in Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
+            ]
+        return turfs
+
+    def create_booking(turf_id, time_slot):
+        """Create a new booking for the user."""
+        turf = Turf.query.get(turf_id)
+        if not turf:
+            flash("Invalid turf selection.")
+            return False
+
+        existing_booking = Booking.query.filter_by(
+            turf_id=turf_id, time_slot=time_slot, status='Accepted'
+        ).first()
+        if existing_booking:
+            flash("This slot is already booked!")
+            return False
+
+        booking = Booking(
+            turf_id=turf_id,
+            user_id=session['user_id'],
+            time_slot=time_slot
+        )
+        db.session.add(booking)
+        db.session.commit()
+        flash("Booking request submitted successfully!")
+        return True
+
     if session.get('role') != 'user':
         flash("Unauthorized access. Please log in as a user.")
         return redirect(url_for('login'))
 
     if request.method == 'GET':
-        # Retrieve all turfs
-        turfs = Turf.query.all()
-
-        # Process turfs to include available and booked slots
-        for turf in turfs:
-            # Split time slots into a list
-            turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
-
-            # Get booked slots for the turf
-            bookings = Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
-            turf.booked_slots = [b.time_slot for b in bookings]
-
+        turfs = process_turfs()
         return render_template('user_dashboard.html', turfs=turfs)
 
-    elif request.method == 'POST':
+    if request.method == 'POST':
         try:
-            # Validate and sanitize inputs
             turf_id = int(request.form.get('turf_id', '').strip())
             time_slot = escape(request.form.get('time_slot', '').strip())
 
-            # Check if the turf exists
-            turf = Turf.query.get(turf_id)
-            if not turf:
-                flash("Invalid turf selection.")
+            if not create_booking(turf_id, time_slot):
                 return redirect(url_for('user_dashboard'))
-
-            # Ensure the selected slot is not already booked
-            existing_booking = Booking.query.filter_by(
-                turf_id=turf_id, time_slot=time_slot, status='Accepted'
-            ).first()
-            if existing_booking:
-                flash("This slot is already booked!")
-            else:
-                # Create a new booking
-                booking = Booking(
-                    turf_id=turf_id,
-                    user_id=session['user_id'],
-                    time_slot=time_slot
-                )
-                db.session.add(booking)
-                db.session.commit()
-                flash("Booking request submitted successfully!")
 
         except ValueError:
             flash("Invalid input. Please select a valid turf and time slot.")
