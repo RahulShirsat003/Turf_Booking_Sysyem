@@ -34,6 +34,8 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"]
 )
 
+METHOD_NOT_ALLOWED_MESSAGE = "Method Not Allowed"
+
 
 # Define base directory
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -138,7 +140,7 @@ def login():
         return redirect(url_for('login'))
 
     # Reject other HTTP methods explicitly
-    return "Method Not Allowed", 405
+    return METHOD_NOT_ALLOWED_MESSAGE, 405
 
 
 @application.route('/register', methods=['GET', 'POST'])
@@ -177,7 +179,7 @@ def register():
         return redirect(url_for('login'))
 
     # Explicitly reject other methods
-    return "Method Not Allowed", 405
+    return METHOD_NOT_ALLOWED_MESSAGE, 405
 
 @application.route('/logout')
 def logout():
@@ -355,7 +357,7 @@ def turf_image(turf_id):
             as_attachment=False,
             download_name=turf.photo_name
         )
-    return 'No image available', 404
+    return METHOD_NOT_ALLOWED_MESSAGE, 405
     
 
 @application.route('/view_turfs', methods=['GET'])
@@ -606,10 +608,6 @@ def debug():
     turfs = Turf.query.all()
     return {turf.id: turf.photo for turf in turfs}
     
-
-
-    
-
 
 
 if __name__ == '__main__':
