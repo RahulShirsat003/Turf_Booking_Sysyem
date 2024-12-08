@@ -6,89 +6,75 @@
     <title>Admin Dashboard - Turf Booking System</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
+            background: #f8f9fa;
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #1a1a2e, #e94560);
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        nav {
-            width: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            padding: 1rem;
-            position: fixed;
-            top: 0;
-            left: 0;
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            z-index: 1000;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-        }
-
-        nav a {
-            color: #ffffff;
-            text-decoration: none;
-            font-size: 1.2rem;
-            font-weight: bold;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            transition: background-color 0.3s, color 0.3s;
-        }
-
-        nav a:hover {
-            background-color: #e94560;
-            color: #003d5b;
-        }
-
-        .container {
-            margin-top: 5rem;
-            width: 100%;
-            max-width: 800px;
-            background: #fff;
             color: #333;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            padding: 2rem;
             text-align: center;
         }
 
+        nav {
+            background: #343a40;
+            color: #fff;
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+        }
+
+        nav a {
+            color: #fff;
+            margin: 0 1rem;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            margin: 6rem auto 2rem;
+            max-width: 800px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
         h2 {
-            color: #1a1a2e;
             margin-bottom: 1rem;
+            color: #495057;
         }
 
         form label {
             display: block;
-            margin: 0.5rem 0 0.2rem;
             text-align: left;
-            color: #333;
+            margin-bottom: 0.5rem;
+            color: #495057;
         }
 
         form input, form button {
             width: 100%;
-            padding: 0.8rem;
+            padding: 0.7rem;
             margin-bottom: 1rem;
-            border: 1px solid #ccc;
+            border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 1rem;
         }
 
         form button {
-            background-color: #1a1a2e;
+            background: #007bff;
             color: #fff;
             font-weight: bold;
             cursor: pointer;
-            transition: background-color 0.3s;
+            border: none;
         }
 
         form button:hover {
-            background-color: #e94560;
+            background: #0056b3;
         }
 
         table {
@@ -98,56 +84,42 @@
         }
 
         table th, table td {
-            border: 1px solid #ccc;
+            border: 1px solid #ddd;
             padding: 0.8rem;
             text-align: center;
         }
 
         table th {
-            background-color: #1a1a2e;
+            background: #007bff;
             color: #fff;
         }
 
         table tr:nth-child(even) {
-            background-color: #f4f4f9;
-        }
-
-        table tr:hover {
-            background-color: #e94560;
-            color: #fff;
+            background: #f8f9fa;
         }
 
         .action-buttons button {
-            padding: 0.5rem 1rem;
-            margin: 0.2rem;
+            padding: 0.5rem;
+            margin: 0 0.2rem;
             border: none;
-            border-radius: 5px;
+            border-radius: 3px;
             cursor: pointer;
-            transition: background-color 0.3s;
         }
 
-        .action-buttons .edit {
-            background-color: #28a745;
+        .edit {
+            background: #28a745;
             color: #fff;
         }
 
-        .action-buttons .edit:hover {
-            background-color: #1c7c2d;
-        }
-
-        .action-buttons .delete {
-            background-color: #e94560;
+        .delete {
+            background: #dc3545;
             color: #fff;
-        }
-
-        .action-buttons .delete:hover {
-            background-color: #a83246;
         }
 
         footer {
             margin-top: 2rem;
-            text-align: center;
-            color: #ddd;
+            font-size: 0.9rem;
+            color: #666;
         }
     </style>
     <script>

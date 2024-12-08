@@ -1,7 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
-from werkzeug.security import escape
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter.util import get_remote_address
 import os

@@ -1,21 +1,131 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Turf Booking System</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #003d5b, #00a8e8);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
 
-{% block title %}Register{% endblock %}
+        nav {
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 1rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            z-index: 1000;
+        }
 
-{% block content %}
-<div class="container">
-    <h2>Register</h2>
-    <form method="post" action="/register">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" required>
+        nav a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 1.2rem;
+            transition: color 0.3s;
+        }
 
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" required>
+        nav a:hover {
+            color: #e94560;
+        }
 
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" required>
+        .container {
+            margin-top: 5rem; /* Space for the navbar */
+            width: 100%;
+            max-width: 400px;
+            background: #fff;
+            color: #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+            text-align: center;
+        }
 
-        <button type="submit">Register</button>
-    </form>
-</div>
-{% endblock %}
+        h2 {
+            margin-bottom: 1rem;
+            color: #1a1a2e;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            text-align: left;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: #1a1a2e;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e94560;
+        }
+
+        footer {
+            margin-top: 2rem;
+            text-align: center;
+            color: #ddd;
+        }
+
+        footer a {
+            color: #e94560;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+    </nav>
+
+    <div class="container">
+        <h2>Register</h2>
+        <form method="post" action="/register">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" placeholder="Enter your username" required>
+
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="Enter your email" required>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" placeholder="Enter your password" required>
+
+            <button type="submit">Register</button>
+        </form>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Turf Booking System. <a href="/about">Learn more</a></p>
+    </footer>
+</body>
+</html>

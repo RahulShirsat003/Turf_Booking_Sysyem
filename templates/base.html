@@ -3,21 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turf Booking System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>{% block title %}Turf Booking System{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}">
+    {% block head %}{% endblock %}
 </head>
 <body>
-    <div class="navbar">
-        <a href="{{ url_for('home') }}">Home</a>
-        {% if session.get('role') %}
-            <a href="{{ url_for(session['role'] + '_dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('logout') }}">Logout</a>
-        {% else %}
-            <a href="{{ url_for('login') }}">Login</a>
-        {% endif %}
-    </div>
-    <div class="container">
+    <nav>
+        <a href="/">Home</a>
+        <a href="/view_turfs">View Turfs</a>
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+        <a href="/logout">Logout</a>
+    </nav>
+
+    <main>
         {% block content %}{% endblock %}
-    </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Turf Booking System. All rights reserved.</p>
+    </footer>
 </body>
 </html>
