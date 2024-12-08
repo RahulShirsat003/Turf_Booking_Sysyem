@@ -13,3 +13,4 @@ Flask-WTF==1.1.1
 Werkzeug==2.3.7
 Flask-SQLAlchemy
 gunicorn
+Flask-Limiter
