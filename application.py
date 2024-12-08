@@ -178,8 +178,7 @@ def register():
         flash('Registration successful! Please log in.')
         return redirect(url_for('login'))
 
-    # Explicitly reject other methods
-    return METHOD_NOT_ALLOWED_MESSAGE, 405
+    
 
 @application.route('/logout')
 def logout():
@@ -457,8 +456,7 @@ def edit_turf(turf_id):
             flash(f"Error updating turf: {str(e)}")
             return redirect(url_for('edit_turf', turf_id=turf_id))
 
-    # Reject any methods other than GET and POST
-    return "Method Not Allowed", 405
+   
 
 @application.route('/manager/delete_turf', methods=['POST'])
 def delete_turf():
@@ -553,8 +551,7 @@ def user_dashboard():
 
         return redirect(url_for('user_dashboard'))
 
-    # Reject any other methods explicitly
-    return "Method Not Allowed", 405
+    
 
 @application.route('/user/book_turf', methods=['POST'])
 def book_turf():
