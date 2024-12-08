@@ -10,8 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env
 application = Flask(__name__)
-application.secret_key = os.getenv("FLASK_SECRET_KEY")
-
+application.secret_key = os.getenv('SECRET_KEY')
 # Define base directory
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
