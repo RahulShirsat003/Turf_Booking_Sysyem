@@ -1,0 +1,15 @@
+Flask==2.3.3
+Werkzeug>=2.3.7
+boto3==1.28.10
+uuid==1.30
+python-dotenv==1.0.0
+alembic==1.14.0
+attrs==20.3.0
+awscrt==0.19.19
+Babel==2.9.1
+pylint==2.17.5
+python-dotenv==1.0.0
+Flask-WTF==1.1.1
+Werkzeug==2.3.7
+Flask-SQLAlchemy
+gunicorn

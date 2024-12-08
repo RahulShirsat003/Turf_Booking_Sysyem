@@ -1,0 +1,40 @@
+version: 0.2
+env:
+  secrets-manager:
+    # SonarCloud keys retrieved from AWS Secrets Manager.
+    SONARCLOUD_TOKEN: TurfBooking01:Organization
+    SONARCLOUD_ORG: TurfBooking01:Host
+    PROJECTKEY: TurfBooking01:Project
+    HOST: TurfBooking01:sonartoken
+    
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+      java: corretto21
+  pre_build:
+    commands:
+      - yum update -y     # Equivalent to apt-get update
+      - yum install -y jq # Install jq using yum package manager
+      - retry_count=3
+      - for i in $(seq 1 $retry_count); do wget https://archive.apache.org/dist/maven/maven-3/3.5.4/binaries/apache-maven-3.5.4-bin.tar.gz && break || sleep 10; done
+      - tar xzf apache-maven-3.5.4-bin.tar.gz || true
+      - ln -s apache-maven-3.5.4 maven
+      - wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-3.3.0.1492-linux.zip
+      - unzip ./sonar-scanner-cli-3.3.0.1492-linux.zip
+      - mv sonar-scanner-3.3.0.1492-linux /sonar-scanner
+      - export PATH=$PATH:/sonar-scanner/bin/
+      
+  build:
+    commands:
+      # Moves all pom.xml files found in the system to the root directory. Ignores errors if no pom.xml files are found.
+      - find / -name pom.xml -exec mv {} ./pom.xml \; || true  
+      # Executes Sonar analysis using Maven with provided SonarCloud parameters.
+      - mvn sonar:sonar -Dsonar.login=$SONARCLOUD_TOKEN -Dsonar.host.url=$HOST -Dsonar.projectKey=$PROJECTKEY -Dsonar.organization=$SONARCLOUD_ORG
+      - sleep 5
+      # Check the HTTP response status code directly
+      - if curl -s -o /dev/null -w "%{http_code}" https://sonarcloud.io/api/qualitygates/project_status?projectKey=$PROJECTKEY != "200"; then exit 1; fi
+
+artifacts:
+   files:
+    - '*/'

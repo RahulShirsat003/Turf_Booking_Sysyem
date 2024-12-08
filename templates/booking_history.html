@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking History</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #e94560);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+         nav {
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 1rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        nav a {
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        nav a:hover {
+            background-color:#e94560;
+            color: #003d5b;
+        }
+
+        .container {
+            margin-top: 5rem;
+            width: 90%;
+            max-width: 800px;
+            background: #fff;
+            color: #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+        }
+
+        h2 {
+            text-align: center;
+            color: #1a1a2e;
+            margin-bottom: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            text-align: left;
+        }
+
+        table th, table td {
+            padding: 1rem;
+            border: 1px solid #ddd;
+        }
+
+        table th {
+            background-color: #1a1a2e;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        table tr:nth-child(even) {
+            background-color: #f4f4f9;
+        }
+
+        table tr:hover {
+            background-color: #e94560;
+            color: #fff;
+        }
+
+        .status-pending {
+            color: #e94560;
+            font-weight: bold;
+        }
+
+        .status-accepted {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .delete-btn:hover {
+            background-color: #a71d2a;
+        }
+
+        footer {
+            margin-top: 2rem;
+            text-align: center;
+            color: #ddd;
+        }
+    </style>
+    <script>
+        function confirmDelete(event) {
+            if (!confirm("Are you sure you want to delete this booking?")) {
+                event.preventDefault();
+            }
+        }
+    </script>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/user_dashboard">Dashboard</a>
+        <a href="/logout">Logout</a>
+    </nav>
+
+    <div class="container">
+        <h2>Booking History</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Turf Name</th>
+                    <th>Time Slot</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                <tr>
+                    <td>{{ booking.turf_name }}</td>
+                    <td>{{ booking.time_slot }}</td>
+                    <td>${{ booking.price }}</td>
+                    <td>
+                        <span class="status-{{ booking.status|lower }}">{{ booking.status }}</span>
+                    </td>
+                    <td>
+                        <form method="post" action="/delete_booking" style="display:inline;">
+                            <input type="hidden" name="booking_id" value="{{ booking.id }}">
+                            <button type="submit" class="delete-btn" onclick="confirmDelete(event)">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Turf Booking System. All rights reserved.</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Turfs</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #e94560);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        nav {
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 1rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        nav a {
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        nav a:hover {
+            background-color:#e94560;
+            color: #003d5b;
+        }
+
+        .container {
+            margin-top: 5rem;
+            width: 90%;
+            max-width: 800px;
+        }
+
+        .turf-card {
+            background: #fff;
+            color: #333;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .turf-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .turf-card .details {
+            padding: 1rem;
+        }
+
+        .turf-card h3 {
+            color: #1a1a2e;
+        }
+
+        .slots {
+            margin-top: 1rem;
+            background: #f4f4f9;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .slots ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .slots ul li {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .slots ul li.booked {
+            background: #e94560;
+            color: #fff;
+            font-weight: bold;
+            position: relative;
+        }
+
+        .slots ul li.booked::after {
+            content: ' (Booked)';
+            font-size: 0.8rem;
+            color: #fff;
+            margin-left: 5px;
+        }
+
+        .booking-list {
+            margin-top: 1rem;
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .booking-list table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .booking-list th, .booking-list td {
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+        }
+
+        .booking-list th {
+            background: #1a1a2e;
+            color: #fff;
+        }
+
+        .booking-list tr:hover {
+            background: #e94560;
+            color: #fff;
+        }
+
+        .accepted {
+            color: #e94560;
+            font-weight: bold;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 1rem;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn-edit {
+            background: #007bff;
+            color: #fff;
+        }
+
+        .btn-edit:hover {
+            background: #0056b3;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: #fff;
+        }
+
+        .btn-delete:hover {
+            background: #a71d2a;
+        }
+
+        .accept-btn {
+            background: #28a745;
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .accept-btn:hover {
+            background: #1c7c2d;
+        }
+    </style>
+    <script>
+        function confirmDelete(event) {
+            if (!confirm("Are you sure you want to delete this turf?")) {
+                event.preventDefault();
+            }
+        }
+    </script>
+</head>
+<body>
+<nav>
+    <a href="/">Home</a>
+    <a href="/manager_dashboard">Dashboard</a>
+    <a href="/logout">Logout</a>
+</nav>
+
+<div class="container">
+    {% for turf in turfs %}
+    <div class="turf-card">
+        <img src="{{ url_for('turf_image', turf_id=turf.id) }}" alt="{{ turf.name }}" style="width: 100%; height: auto;">
+        <div class="details">
+            <h3>{{ turf.name }}</h3>
+            <p><strong>Location:</strong> {{ turf.location }}</p>
+            <p><strong>Price:</strong> ${{ turf.price }} per hour</p>
+
+            <div class="slots">
+                <h4>Available Time Slots</h4>
+                <ul>
+                    {% for slot in turf.time_slots_list %}
+                    <li class="{% if slot in turf.booked_slots %}booked{% endif %}">
+                        {{ slot }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="action-buttons">
+                <a href="/manager/edit_turf/{{ turf.id }}" class="btn btn-edit">Edit Turf</a>
+                <form method="post" action="/manager/delete_turf" style="display:inline;">
+                    <input type="hidden" name="turf_id" value="{{ turf.id }}">
+                    <button type="submit" class="btn btn-delete" onclick="confirmDelete(event)">Delete Turf</button>
+                </form>
+            </div>
+
+            <div class="booking-list">
+                <div class="booking-list">
+                    <h4>Booking Requests</h4>
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>User Name</th>
+                            <th>Time Slot</th>
+                            <th>Status</th>
+                            <th>Action</th> <!-- New Action column -->
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for booking in turf.bookings %}
+                        <tr>
+                            <td>{{ booking.user.username }}</td>
+                            <td>{{ booking.time_slot }}</td>
+                            <td>
+                                {% if booking.status == 'Accepted' %}
+                                <span class="accepted">Accepted</span>
+                                {% else %}
+                                Pending
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if booking.status != 'Accepted' %}
+                                <!-- Form to accept the booking -->
+                                <form method="post" action="/manager/accept_booking" style="display:inline;">
+                                    <input type="hidden" name="booking_id" value="{{ booking.id }}">
+                                    <button type="submit" class="accept-btn">Accept</button>
+                                </form>
+                                {% else %}
+                                <!-- Show a disabled button for already accepted bookings -->
+                                <button class="accept-btn" disabled>Accepted</button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Turf</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #e94560);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+         nav {
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 1rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        nav a {
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        nav a:hover {
+            background-color:#e94560;
+            color: #003d5b;
+        }
+
+        .container {
+            margin-top: 5rem; /* Space for the navbar */
+            width: 100%;
+            max-width: 600px;
+            background: #fff;
+            color: #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+        }
+
+        h2 {
+            color: #1a1a2e;
+            margin-bottom: 1rem;
+        }
+
+        form label {
+            display: block;
+            margin: 0.5rem 0 0.2rem;
+            text-align: left;
+            color: #333;
+        }
+
+        form input, form select, form button {
+            width: 100%;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        form button {
+            background-color: #1a1a2e;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        form button:hover {
+            background-color: #e94560;
+        }
+
+        footer {
+            margin-top: 2rem;
+            text-align: center;
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/view_turfs">Manage Turfs</a>
+        <a href="/logout">Logout</a>
+    </nav>
+
+    <div class="container">
+        <h2>Edit Turf</h2>
+        <form method="post" enctype="multipart/form-data">
+            <label for="name">Turf Name:</label>
+            <input type="text" id="name" name="name" value="{{ turf.name }}" placeholder="Enter turf name" required>
+
+            <label for="location">Location:</label>
+            <input type="text" id="location" name="location" value="{{ turf.location }}" placeholder="Enter location" required>
+
+            <label for="price">Price (per hour):</label>
+            <input type="number" id="price" name="price" value="{{ turf.price }}" step="0.01" placeholder="Enter price" required>
+
+
+
+            <label for="photo">Upload New Photo (optional):</label>
+            <input type="file" id="photo" name="photo">
+
+            <button type="submit">Update Turf</button>
+        </form>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Turf Booking System. All rights reserved.</p>
+    </footer>
+</body>
+</html>

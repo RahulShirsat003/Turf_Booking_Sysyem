@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #e94560);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        nav {
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 1rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        nav a {
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        nav a:hover {
+            background-color:#e94560;
+            color: #003d5b;
+        }
+
+        .container {
+            margin-top: 5rem;
+            width: 90%;
+            max-width: 800px;
+            background: #fff;
+            color: #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+        }
+
+        h2 {
+            text-align: center;
+            color: #1a1a2e;
+            margin-bottom: 1rem;
+        }
+
+        .turf-card {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .turf-photo {
+            flex: 1;
+            max-width: 250px; /* Adjust to accommodate the larger image size */
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .turf-photo img {
+            width: 100%;
+            height: 250px; /* Increase the height */
+            object-fit: cover; /* Ensure the image scales properly */
+        }
+
+        .turf-details {
+            flex: 2;
+        }
+
+        .turf-details h3 {
+            color: #1a1a2e;
+        }
+
+        .status-pending {
+            color: #28a745; /* Green for available slots */
+            font-weight: bold;
+        }
+
+        .status-booked {
+            color: #e94560; /* Red for booked slots */
+            font-weight: bold;
+        }
+
+        .turf-details button {
+            background: #1a1a2e;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            padding: 0.8rem 1.5rem;
+            text-align: center;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+
+        .turf-details button:hover {
+            background: #e94560;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/history">Booking History</a>
+        <a href="/logout">Logout</a>
+    </nav>
+
+    <div class="container">
+        <h2>User Dashboard</h2>
+        {% for turf in turfs %}
+        <div class="turf-card">
+            <div class="turf-photo">
+                <img src="{{ url_for('turf_image', turf_id=turf.id) }}" alt="{{ turf.name }}">
+            </div>
+            <div class="turf-details">
+                <h3>{{ turf.name }}</h3>
+                <p><strong>Location:</strong> {{ turf.location }}</p>
+                <p><strong>Price:</strong> ${{ turf.price }} per hour</p>
+                <p><strong>Available Time Slots:</strong></p>
+                <ul>
+                    {% for slot in turf.time_slots_list %}
+                    <li class="{% if slot in turf.booked_slots %}status-booked{% else %}status-pending{% endif %}">
+                        {{ slot }} {% if slot in turf.booked_slots %} (Booked) {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                <form method="post" action="/user/book_turf">
+                    <label for="time_slot">Choose Time Slot:</label>
+                    <select id="time_slot" name="time_slot" required>
+                        {% for slot in turf.time_slots_list %}
+                        {% if slot not in turf.booked_slots %}
+                        <option value="{{ slot }}">{{ slot }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="turf_id" value="{{ turf.id }}">
+                    <button type="submit">Book Now</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>
