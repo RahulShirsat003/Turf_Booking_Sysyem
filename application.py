@@ -3,7 +3,6 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from werkzeug.security import escape
 from flask_wtf.csrf import CSRFProtect
-from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import os
 import io
@@ -11,6 +10,9 @@ import boto3
 import json
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 from dotenv import load_dotenv
+from flask_limiter import Limiter
+import logging
+logging.basicConfig(level=logging.INFO)
 
 # Load environment variables from .env
 load_dotenv()
@@ -28,6 +30,7 @@ limiter = Limiter(
     app=application,
     default_limits=["200 per day", "50 per hour"]
 )
+
 
 # Define base directory
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -68,23 +71,6 @@ class Booking(db.Model):
     status = db.Column(db.String(20), default='Pending')
 
 
-# Function to retrieve secrets securely
-def get_secret(secret_name, region_name="eu-west-1"):
-    client = boto3.client("secretsmanager", region_name=region_name)
-    try:
-        response = client.get_secret_value(SecretId=secret_name)
-        secret = json.loads(response["SecretString"])
-        return secret
-    except ClientError as e:
-        raise Exception(f"Secrets Manager client error: {e.response['Error']['Message']}")
-    except json.JSONDecodeError as e:
-        raise Exception(f"Error decoding JSON response from Secrets Manager: {str(e)}")
-    except NoCredentialsError:
-        raise Exception("AWS credentials not found")
-    except PartialCredentialsError as e:
-        raise Exception(f"Incomplete AWS credentials: {str(e)}")
-    except Exception as e:
-        raise Exception(f"Unexpected error: {str(e)}")
 
 
 # Routes
@@ -93,27 +79,35 @@ def home():
     return render_template('home.html')
 
 
+
+
 @application.route('/login', methods=['GET', 'POST'])
-@csrf.exempt
+@csrf.exempt  # CSRF is disabled, but additional safeguards are added
+@limiter.limit("5 per minute")  # Limit to 5 login attempts per minute
 def login():
     # Retrieve admin credentials from environment variables
     admin_username = os.getenv("ADMIN_USERNAME")
     admin_password = os.getenv("ADMIN_PASSWORD")
 
-    # Check if admin credentials are set
     if not admin_username or not admin_password:
         raise ValueError("Admin username or password environment variables are not set")
 
     if request.method == 'POST':
-        username = escape(request.form['username'])
-        password = escape(request.form['password'])
-        role = escape(request.form['role'])
+        # Validate request origin
+        origin = request.headers.get('Origin')
+        if not origin or "yourdomain.com" not in origin:
+            return "Invalid origin", 403
+
+        # Sanitize inputs
+        username = escape(request.form.get('username', '').strip())
+        password = escape(request.form.get('password', '').strip())
+        role = escape(request.form.get('role', '').strip())
 
         # Admin Login
         if role == "admin":
             if username == admin_username and password == admin_password:
                 session['role'] = 'admin'
-                session['user_id'] = 0  # No specific ID for admin
+                session['user_id'] = 0
                 flash('Logged in as Admin.')
                 return redirect(url_for('admin_dashboard'))
             else:
@@ -338,14 +332,20 @@ def view_turfs():
     return redirect(url_for('login'))
     
     
-# Debugging route for turfs
 @application.route('/debug_turfs', methods=['GET'])
-@csrf.exempt
+@csrf.exempt  # CSRF is disabled, but additional safeguards are implemented
 @limiter.limit("2 per minute")
 def debug_turfs():
-    turfs = Turf.query.all()
-    return jsonify({turf.id: {"name": turf.name, "location": turf.location} for turf in turfs})
+    # Log access for auditing
+    logging.info(f"Debug turfs accessed by user: {session.get('user_id')}, role: {session.get('role')}")
 
+    # Restrict access to admins only
+    if 'role' not in session or session['role'] != 'admin':
+        return "Unauthorized", 403
+
+    # Fetch turfs and return limited data
+    turfs = Turf.query.all()
+    return jsonify({turf.id: {"name": turf.name} for turf in turfs})  
 
 
 
