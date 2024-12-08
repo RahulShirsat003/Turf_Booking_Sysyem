@@ -12,6 +12,9 @@ from botocore.exceptions import ClientError, NoCredentialsError, PartialCredenti
 from dotenv import load_dotenv
 from flask_limiter import Limiter
 import logging
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.security import generate_password_hash
+
 logging.basicConfig(level=logging.INFO)
 
 # Load environment variables from .env
@@ -82,8 +85,8 @@ def home():
 
 
 @application.route('/login', methods=['GET', 'POST'])
-@csrf.exempt  # CSRF is disabled, but additional safeguards are added
-@limiter.limit("5 per minute")  # Limit to 5 login attempts per minute
+@csrf.exempt  # CSRF protection is disabled for demonstration; consider enabling it.
+@limiter.limit("5 per minute")  # Limit login attempts
 def login():
     # Retrieve admin credentials from environment variables
     admin_username = os.getenv("ADMIN_USERNAME")
@@ -92,8 +95,13 @@ def login():
     if not admin_username or not admin_password:
         raise ValueError("Admin username or password environment variables are not set")
 
-    if request.method == 'POST':
-        # Validate request origin
+    # Handle GET request to display the login form
+    if request.method == 'GET':
+        return render_template('login.html')
+
+    # Handle POST request to process login
+    elif request.method == 'POST':
+        # Validate the origin of the request
         origin = request.headers.get('Origin')
         if not origin or "yourdomain.com" not in origin:
             return "Invalid origin", 403
@@ -127,15 +135,30 @@ def login():
             else:
                 flash('Invalid credentials or role selection!')
 
-    return render_template('login.html')
+        return redirect(url_for('login'))
+
+    # Reject other HTTP methods explicitly
+    return "Method Not Allowed", 405
 
 
 @application.route('/register', methods=['GET', 'POST'])
+@csrf.exempt  # Remove this line if you want to enable CSRF for both GET and POST
+@limiter.limit("3 per minute")  # Limit to 3 registration attempts per minute
 def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
+    if request.method == 'GET':
+        # Render the registration form
+        return render_template('register.html')
+
+    elif request.method == 'POST':
+        # Sanitize and validate inputs
+        username = escape(request.form['username'].strip())
+        email = escape(request.form['email'].strip())
+        password = escape(request.form['password'].strip())
+
+        # Basic validation
+        if not username or not email or not password:
+            flash("All fields are required!")
+            return redirect(url_for('register'))
 
         # Check for unique username and email
         existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
@@ -143,14 +166,18 @@ def register():
             flash('Username or email already exists!')
             return redirect(url_for('register'))
 
+        # Hash the password before storing it
+        hashed_password = generate_password_hash(password)
+
         # Create a new user
-        new_user = User(username=username, email=email, password=password, role='user')
+        new_user = User(username=username, email=email, password=hashed_password, role='user')
         db.session.add(new_user)
         db.session.commit()
         flash('Registration successful! Please log in.')
         return redirect(url_for('login'))
 
-    return render_template('register.html')
+    # Explicitly reject other methods
+    return "Method Not Allowed", 405
 
 @application.route('/logout')
 def logout():
@@ -245,29 +272,52 @@ def delete_manager():
             db.session.commit()
             flash('Turf Manager deleted successfully.')
         return redirect(url_for('admin_dashboard'))
-
-
-@application.route('/manager_dashboard', methods=['GET', 'POST'])
-@limiter.limit("10 per minute")
+        
+        
+        
+@application.route('/manager_dashboard', methods=['GET'])
+@limiter.limit("10 per minute")  # Limit GET requests to prevent abuse
 def manager_dashboard():
     if session.get('role') != 'manager':
         return redirect(url_for('login'))
 
-    if request.method == 'POST':
-        name = request.form['name']
-        location = request.form['location']
-        price = float(request.form['price'])
-        photo = request.files['photo']
-        time_slots = request.form.getlist('time_slots[]')  # Fetch list of time slots
+    # Fetch all turfs managed by the logged-in manager
+    turfs = Turf.query.filter_by(manager_id=session['user_id']).all()
+    print(f"Manager ID: {session['user_id']}, Turfs Count: {len(turfs)}")
+    return render_template('manager_dashboard.html', turfs=turfs)
 
-        print(f"Form Data: Name={name}, Location={location}, Price={price}, Time Slots={time_slots}")
 
-        if not time_slots:
-            flash('Please add at least one time slot.')
+@application.route('/manager_dashboard/add_turf', methods=['POST'])
+@csrf.exempt  # Remove this line if CSRF protection is enabled
+@limiter.limit("5 per minute")  # Limit POST requests to prevent abuse
+def add_turf():
+    if session.get('role') != 'manager':
+        return redirect(url_for('login'))
+
+    # Validate and sanitize inputs
+    name = escape(request.form.get('name', '').strip())
+    location = escape(request.form.get('location', '').strip())
+    price = request.form.get('price', '').strip()
+    photo = request.files.get('photo')
+    time_slots = request.form.getlist('time_slots[]')  # Fetch list of time slots
+
+    try:
+        # Validate required fields
+        if not name or not location or not price or not time_slots or not photo:
+            flash('All fields are required.')
             return redirect(url_for('manager_dashboard'))
 
-        # Combine time slots into a comma-separated string
-        time_slots_str = ','.join(time_slots)
+        # Validate price
+        try:
+            price = float(price)
+            if price <= 0:
+                raise ValueError("Price must be positive.")
+        except ValueError:
+            flash('Invalid price. Please enter a positive number.')
+            return redirect(url_for('manager_dashboard'))
+
+        # Process time slots
+        time_slots_str = ','.join([escape(slot) for slot in time_slots])
 
         # Process photo data
         photo_data = photo.read()
@@ -278,7 +328,7 @@ def manager_dashboard():
             name=name,
             location=location,
             price=price,
-            time_slots=time_slots_str,  # Save time slots as a single string
+            time_slots=time_slots_str,
             photo_data=photo_data,
             photo_name=photo_name,
             manager_id=session['user_id']
@@ -287,9 +337,11 @@ def manager_dashboard():
         db.session.commit()
         flash('Turf added successfully!')
 
-    turfs = Turf.query.filter_by(manager_id=session['user_id']).all()
-    print(f"Manager ID: {session['user_id']}, Turfs Count: {len(turfs)}")
-    return render_template('manager_dashboard.html', turfs=turfs)
+    except Exception as e:
+        flash(f"Error adding turf: {str(e)}")
+        db.session.rollback()
+
+    return redirect(url_for('manager_dashboard'))
     
     
 # Route to serve the image from the database
@@ -350,37 +402,61 @@ def debug_turfs():
 
 
 @application.route('/manager/edit_turf/<int:turf_id>', methods=['GET', 'POST'])
+@csrf.exempt  # Remove this line if enabling CSRF protection
+@limiter.limit("5 per minute")  # Limit editing attempts to 5 per minute
 def edit_turf(turf_id):
-    if 'user_id' in session and session.get('role') == 'manager':
-        turf = Turf.query.get(turf_id)
+    # Ensure the user is logged in and is a manager
+    if 'user_id' not in session or session.get('role') != 'manager':
+        flash("Unauthorized access. Please log in as a manager.")
+        return redirect(url_for('login'))
 
-        if not turf or turf.manager_id != session['user_id']:
-            flash('Unauthorized access or Turf not found.')
-            return redirect(url_for('view_turfs'))
+    # Fetch the turf by ID
+    turf = Turf.query.get(turf_id)
+    if not turf or turf.manager_id != session['user_id']:
+        flash('Unauthorized access or Turf not found.')
+        return redirect(url_for('view_turfs'))
 
-        if request.method == 'POST':
-            turf.name = request.form['name']
-            turf.location = request.form['location']
-            turf.price = request.form['price']
-            # Convert the time_slots to a comma-separated string
+    if request.method == 'GET':
+        # Prepare time slots for the edit form
+        time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
+        return render_template('edit_turf.html', turf=turf, time_slots_list=time_slots_list)
 
-            photo = request.files['photo']
+    elif request.method == 'POST':
+        try:
+            # Validate and sanitize inputs
+            turf.name = escape(request.form.get('name', '').strip())
+            turf.location = escape(request.form.get('location', '').strip())
+            price = request.form.get('price', '').strip()
 
+            # Validate price
+            try:
+                turf.price = float(price)
+                if turf.price <= 0:
+                    raise ValueError("Price must be positive.")
+            except ValueError:
+                flash('Invalid price. Please enter a positive number.')
+                return redirect(url_for('edit_turf', turf_id=turf_id))
+
+            # Handle photo upload
+            photo = request.files.get('photo')
             if photo:
                 filename = secure_filename(photo.filename)
-                photo_path = os.path.join(application.config['UPLOAD_FOLDER'], filename)
-                photo.save(photo_path)
-                turf.photo = filename  # Update the photo if provided
+                photo_data = photo.read()
+                turf.photo_data = photo_data
+                turf.photo_name = filename
 
+            # Save changes to the database
             db.session.commit()
             flash('Turf updated successfully!')
             return redirect(url_for('view_turfs'))
 
-        # Prepare time_slots as a list for rendering in the form
-        time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
-        return render_template('edit_turf.html', turf=turf, time_slots_list=time_slots_list)
-    else:
-        return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating turf: {str(e)}")
+            return redirect(url_for('edit_turf', turf_id=turf_id))
+
+    # Reject any methods other than GET and POST
+    return "Method Not Allowed", 405
 
 @application.route('/manager/delete_turf', methods=['POST'])
 def delete_turf():
@@ -417,41 +493,66 @@ def accept_booking():
 
 
 @application.route('/user_dashboard', methods=['GET', 'POST'])
-@limiter.limit("10 per minute")
+@limiter.limit("10 per minute")  # Limit user dashboard access to 10 requests per minute
 def user_dashboard():
     if session.get('role') != 'user':
+        flash("Unauthorized access. Please log in as a user.")
         return redirect(url_for('login'))
 
-    turfs = Turf.query.all()
-    for turf in turfs:
-        # Convert comma-separated time slots to a list
-        turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
+    if request.method == 'GET':
+        # Retrieve all turfs
+        turfs = Turf.query.all()
 
-        # Get booked slots for this turf
-        bookings = Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
-        turf.booked_slots = [b.time_slot for b in bookings]
+        # Process turfs to include available and booked slots
+        for turf in turfs:
+            # Split time slots into a list
+            turf.time_slots_list = turf.time_slots.split(',') if turf.time_slots else []
 
-    if request.method == 'POST':
-        turf_id = int(request.form['turf_id'])
-        time_slot = request.form['time_slot']
+            # Get booked slots for the turf
+            bookings = Booking.query.filter_by(turf_id=turf.id, status='Accepted').all()
+            turf.booked_slots = [b.time_slot for b in bookings]
 
-        # Ensure the selected slot is not already booked
-        existing_booking = Booking.query.filter_by(turf_id=turf_id, time_slot=time_slot, status='Accepted').first()
-        if existing_booking:
-            flash("This slot is already booked!")
-        else:
-            # Create a new booking
-            booking = Booking(
-                turf_id=turf_id,
-                user_id=session['user_id'],
-                time_slot=time_slot
-            )
-            db.session.add(booking)
-            db.session.commit()
-            flash("Booking request submitted!")
+        return render_template('user_dashboard.html', turfs=turfs)
 
-    return render_template('user_dashboard.html', turfs=turfs)
-    
+    elif request.method == 'POST':
+        try:
+            # Validate and sanitize inputs
+            turf_id = int(request.form.get('turf_id', '').strip())
+            time_slot = escape(request.form.get('time_slot', '').strip())
+
+            # Check if the turf exists
+            turf = Turf.query.get(turf_id)
+            if not turf:
+                flash("Invalid turf selection.")
+                return redirect(url_for('user_dashboard'))
+
+            # Ensure the selected slot is not already booked
+            existing_booking = Booking.query.filter_by(
+                turf_id=turf_id, time_slot=time_slot, status='Accepted'
+            ).first()
+            if existing_booking:
+                flash("This slot is already booked!")
+            else:
+                # Create a new booking
+                booking = Booking(
+                    turf_id=turf_id,
+                    user_id=session['user_id'],
+                    time_slot=time_slot
+                )
+                db.session.add(booking)
+                db.session.commit()
+                flash("Booking request submitted successfully!")
+
+        except ValueError:
+            flash("Invalid input. Please select a valid turf and time slot.")
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error processing booking: {str(e)}")
+
+        return redirect(url_for('user_dashboard'))
+
+    # Reject any other methods explicitly
+    return "Method Not Allowed", 405
 
 @application.route('/user/book_turf', methods=['POST'])
 def book_turf():
@@ -512,7 +613,15 @@ def debug():
 
 
 if __name__ == '__main__':
+    # Ensure the database is initialized
     with application.app_context():
-        db.create_all()  
-    application.run(debug=True,host='0.0.0.0',port=8080)
+        db.create_all()
+
+    # Use environment variables to manage configurations
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
+    port = int(os.getenv("FLASK_PORT", "8080"))
+
+    # Run the application with debug mode disabled by default
+    application.run(debug=debug_mode, host=host, port=port)
 
