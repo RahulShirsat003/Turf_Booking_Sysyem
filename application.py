@@ -1,13 +1,33 @@
-from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file
+from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
+from werkzeug.security import escape
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
 import io
 import boto3
 import json
+from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
+from dotenv import load_dotenv
 
+# Load environment variables from .env
+load_dotenv()
+
+# Initialize Flask application
 application = Flask(__name__)
-application.secret_key = 'turfbookingsecret'
+application.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+# Enable CSRF protection
+csrf = CSRFProtect(application)
+
+# Enable rate limiting
+limiter = Limiter(
+    get_remote_address,
+    app=application,
+    default_limits=["200 per day", "50 per hour"]
+)
 
 # Define base directory
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -18,7 +38,6 @@ application.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the database
 db = SQLAlchemy(application)
-
 
 # Models
 class User(db.Model):
@@ -49,28 +68,33 @@ class Booking(db.Model):
     status = db.Column(db.String(20), default='Pending')
 
 
-# Routes
-@application.route('/')
-def home():
-    return render_template('home.html')
-    
-    
-def get_admin_credentials():
-    secret_name = "admin/credentials"  # Replace with your secret name
-    region_name = "eu-west-1"  
-
-    # Create a Secrets Manager client
+# Function to retrieve secrets securely
+def get_secret(secret_name, region_name="eu-west-1"):
     client = boto3.client("secretsmanager", region_name=region_name)
-
     try:
         response = client.get_secret_value(SecretId=secret_name)
         secret = json.loads(response["SecretString"])
         return secret
+    except ClientError as e:
+        raise Exception(f"Secrets Manager client error: {e.response['Error']['Message']}")
+    except json.JSONDecodeError as e:
+        raise Exception(f"Error decoding JSON response from Secrets Manager: {str(e)}")
+    except NoCredentialsError:
+        raise Exception("AWS credentials not found")
+    except PartialCredentialsError as e:
+        raise Exception(f"Incomplete AWS credentials: {str(e)}")
     except Exception as e:
-        raise Exception(f"Error fetching secret: {str(e)}")
+        raise Exception(f"Unexpected error: {str(e)}")
+
+
+# Routes
+@application.route('/')
+def home():
+    return render_template('home.html')
 
 
 @application.route('/login', methods=['GET', 'POST'])
+@csrf.exempt
 def login():
     # Retrieve admin credentials from environment variables
     admin_username = os.getenv("ADMIN_USERNAME")
@@ -81,9 +105,9 @@ def login():
         raise ValueError("Admin username or password environment variables are not set")
 
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        role = request.form['role']
+        username = escape(request.form['username'])
+        password = escape(request.form['password'])
+        role = escape(request.form['role'])
 
         # Admin Login
         if role == "admin":
@@ -94,7 +118,7 @@ def login():
                 return redirect(url_for('admin_dashboard'))
             else:
                 flash('Invalid Admin credentials!')
-        
+
         # Manager/User Login
         else:
             user = User.query.filter_by(username=username, password=password, role=role).first()
@@ -142,7 +166,8 @@ def logout():
     return redirect(url_for('login'))
 
 
-@application.route('/admin', methods=['GET', 'POST'])
+@application.route('/admin', methods=['GET'])
+@limiter.limit("10 per minute")
 def admin_dashboard():
     if 'role' in session and session['role'] == 'admin':
         managers = User.query.filter_by(role='manager').all()
@@ -178,6 +203,7 @@ def add_manager():
     return redirect(url_for('login'))
 
 @application.route('/admin/edit_manager/<int:manager_id>', methods=['GET'])
+
 def edit_manager(manager_id):
     if 'role' in session and session['role'] == 'admin':
         manager = User.query.get(manager_id)
@@ -228,6 +254,7 @@ def delete_manager():
 
 
 @application.route('/manager_dashboard', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def manager_dashboard():
     if session.get('role') != 'manager':
         return redirect(url_for('login'))
@@ -311,14 +338,14 @@ def view_turfs():
     return redirect(url_for('login'))
     
     
-@application.route('/debug_turfs')
+# Debugging route for turfs
+@application.route('/debug_turfs', methods=['GET'])
+@csrf.exempt
+@limiter.limit("2 per minute")
 def debug_turfs():
     turfs = Turf.query.all()
-    return {turf.id: {
-        "name": turf.name,
-        "manager_id": turf.manager_id,
-        "time_slots": turf.time_slots
-    } for turf in turfs}
+    return jsonify({turf.id: {"name": turf.name, "location": turf.location} for turf in turfs})
+
 
 
 
@@ -390,6 +417,7 @@ def accept_booking():
 
 
 @application.route('/user_dashboard', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def user_dashboard():
     if session.get('role') != 'user':
         return redirect(url_for('login'))
@@ -476,6 +504,8 @@ def delete_booking():
 def debug():
     turfs = Turf.query.all()
     return {turf.id: turf.photo for turf in turfs}
+    
+
 
     
 
@@ -483,6 +513,6 @@ def debug():
 
 if __name__ == '__main__':
     with application.app_context():
-        db.create_all()  # Ensure the database tables are created within the application context.
+        db.create_all()  
     application.run(debug=True,host='0.0.0.0',port=8080)
-# Paste the revised application.py here (already provided earlier)
+
