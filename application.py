@@ -4,7 +4,6 @@ from werkzeug.utils import secure_filename
 import os
 import io
 import boto3
-import json
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 from dotenv import load_dotenv
 
@@ -15,7 +14,7 @@ application.secret_key = os.getenv('SECRET_KEY')
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # Configuration for SQLite database
-application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(base_dir, 'turf_system.db')
+application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join('turf_system.db')
 application.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the database
@@ -453,7 +452,9 @@ def debug():
     turfs = Turf.query.all()
     return {turf.id: turf.photo for turf in turfs}
 
-    
+
+
+
 
 if __name__ == '__main__':
     # Ensure the database is initialized
