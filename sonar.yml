@@ -2,10 +2,10 @@ version: 0.2
 env:
   secrets-manager:
     
-    SONARCLOUD_TOKEN: TurfBooking01:Organization
-    SONARCLOUD_ORG: TurfBooking01:Host
+    SONARCLOUD_ORG: TurfBooking01:Organization
+    HOST: TurfBooking01:Host
     PROJECTKEY: TurfBooking01:Project
-    HOST: TurfBooking01:sonartoken
+    SONARCLOUD_TOKEN: TurfBooking01:sonartoken
     
 phases:
   install:
