@@ -10,13 +10,13 @@ from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env
 application = Flask(__name__)
 application.secret_key = os.getenv('SECRET_KEY')
+
 # Define base directory
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # Configuration for SQLite database
-application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join('turf_system.db')
+application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(base_dir, 'turf_system.db')
 application.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 # Initialize the database
 db = SQLAlchemy(application)
 
