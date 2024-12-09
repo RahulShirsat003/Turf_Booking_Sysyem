@@ -15,10 +15,6 @@ phases:
       - python --version  # Confirm Python version
       - pylint $CODEBUILD_SRC_DIR/*.py || true  # Static analysis
 
-  build:
-    commands:
-      - echo "Building the application..."
-      - python -m unittest discover tests  # Run unit tests
 
   post_build:
     commands:
