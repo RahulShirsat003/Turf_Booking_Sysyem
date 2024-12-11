@@ -1,5 +1,5 @@
 """
-This is a flask based application for DeVopsSec Module
+This is a flask based application for DeVopsSec
 """
 import os
 import io
@@ -200,7 +200,7 @@ def add_manager():
         db.session.commit()
         flash('Turf Manager added successfully.')
         return redirect(url_for('admin_dashboard'))
-    flash('Unauthorized access.')
+    flash('you dont have Unauthorized access.')
     return redirect(url_for('login'))
 
 
@@ -264,7 +264,7 @@ def update_manager():
 
         flash('Turf Manager not found.')
         return redirect(url_for('admin_dashboard'))
-    flash('Unauthorized access.')
+    flash('not have access.')
     return redirect(url_for('login'))
     
 
@@ -289,7 +289,7 @@ def delete_manager():
         else:
             flash('Turf Manager not found.')
         return redirect(url_for('admin_dashboard'))
-    flash('Unauthorized access.')
+    flash('no access.')
     return redirect(url_for('login'))
     
 @application.route('/manager_dashboard', methods=['GET', 'POST'])
