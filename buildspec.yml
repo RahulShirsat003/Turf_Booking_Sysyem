@@ -13,7 +13,7 @@ phases:
     commands:
       - echo "Running pre-build checks..."
       - python --version  
-      - pylint $CODEBUILD_SRC_DIR/*.py || true  
+      - pylint $CODEBUILD_SRC_DIR/*.py   
 
 
   post_build:
