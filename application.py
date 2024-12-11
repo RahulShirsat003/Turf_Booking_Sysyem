@@ -1,9 +1,14 @@
+"""
+This is a flask based application for DeVopsSec Module
+"""
 import os
 import io
 from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+from sqlalchemy.exc import SQLAlchemyError 
+
 
 """
 A Flask application for a turf booking system.
@@ -252,7 +257,7 @@ def update_manager():
             try:
                 db.session.commit()
                 flash('Turf Manager updated successfully.')
-            except Exception as db_error:
+            except SQLAlchemyError as db_error:  # Catch specific SQLAlchemy errors
                 db.session.rollback()
                 flash(f'Error updating manager: {db_error}')
             return redirect(url_for('admin_dashboard'))
@@ -261,7 +266,7 @@ def update_manager():
         return redirect(url_for('admin_dashboard'))
     flash('Unauthorized access.')
     return redirect(url_for('login'))
-
+    
 
 @application.route('/admin/delete_manager', methods=['POST'])
 def delete_manager():
@@ -621,3 +626,4 @@ if __name__ == '__main__':
         host=os.getenv("FLASK_HOST", "0.0.0.0"),
         port=int(os.getenv("FLASK_PORT", "8080"))
     )
+    
