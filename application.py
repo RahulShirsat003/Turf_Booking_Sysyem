@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file, jsonify
+from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file, jsonify,Response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from werkzeug.security import escape
@@ -6,8 +6,6 @@ from flask_wtf.csrf import CSRFProtect
 from flask_limiter.util import get_remote_address
 import os
 import io
-import boto3
-import json
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 from dotenv import load_dotenv
 from flask_limiter import Limiter
@@ -92,42 +90,48 @@ def login():
     admin_username = os.getenv("ADMIN_USERNAME")
     admin_password = os.getenv("ADMIN_PASSWORD")
 
+    # Check if admin credentials are set in environment variables
     if not admin_username or not admin_password:
         raise ValueError("Admin username or password environment variables are not set")
 
     if request.method == 'GET':
+        # Render the login form for GET requests
         return render_template('login.html')
 
     elif request.method == 'POST':
-        # Sanitize inputs
+        # Sanitize and escape input to prevent injection attacks
         username = escape(request.form.get('username', '').strip())
         password = escape(request.form.get('password', '').strip())
         role = escape(request.form.get('role', '').strip())
 
-        # Admin Login
+        # Admin login validation
         if role == "admin":
             if username == admin_username and password == admin_password:
                 session['role'] = 'admin'
-                session['user_id'] = 0
+                session['user_id'] = 0  # Admin does not have a specific user ID
                 flash('Logged in as Admin.')
                 return redirect(url_for('admin_dashboard'))
             else:
                 flash('Invalid login credentials!')
 
-        # Manager/User Login
+        # Manager/User login validation
         else:
+            # Query the user by username and role
             user = User.query.filter_by(username=username, role=role).first()
             if user and check_password_hash(user.password, password):
+                # Save user session
                 session['user_id'] = user.id
                 session['role'] = user.role
                 flash(f"Logged in as {role.capitalize()}.")
-                return redirect(url_for(f"{role}_dashboard"))
+                return redirect(url_for(f"{role}_dashboard"))  # Redirect to the respective dashboard
             else:
                 flash('Invalid login credentials!')
 
+        # Redirect to login page if authentication fails
         return redirect(url_for('login'))
 
-    return "Method Not Allowed", 405
+    # Return a 405 error if the method is unsupported
+    return Response("Method Not Allowed", 405)
 
 
         
