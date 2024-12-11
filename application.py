@@ -174,6 +174,7 @@ def register():
 
     # Explicitly reject other methods
     return "Method Not Allowed", 405
+    
 
 @application.route('/logout')
 def logout():
@@ -355,20 +356,6 @@ def view_turfs():
     return redirect(url_for('login'))
     
     
-@application.route('/debug_turfs', methods=['GET'])
-@csrf.exempt  # CSRF is disabled, but additional safeguards are implemented
-@limiter.limit("2 per minute")
-def debug_turfs():
-    # Log access for auditing
-    logging.info(f"Debug turfs accessed by user: {session.get('user_id')}, role: {session.get('role')}")
-
-    # Restrict access to admins only
-    if 'role' not in session or session['role'] != 'admin':
-        return "Unauthorized", 403
-
-    # Fetch turfs and return limited data
-    turfs = Turf.query.all()
-    return jsonify({turf.id: {"name": turf.name} for turf in turfs})  
 
 
 
@@ -522,11 +509,6 @@ def delete_booking():
             flash('Unauthorized action or booking not found.')
 
     return redirect(url_for('booking_history'))
-    
-@application.route('/debug')
-def debug():
-    turfs = Turf.query.all()
-    return {turf.id: turf.photo for turf in turfs}
     
 
 
