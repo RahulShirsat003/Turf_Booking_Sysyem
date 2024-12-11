@@ -1,15 +1,39 @@
-from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file
+from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
+from werkzeug.security import escape
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter.util import get_remote_address
 import os
 import io
 import boto3
+import json
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 from dotenv import load_dotenv
+from flask_limiter import Limiter
+import logging
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.security import generate_password_hash
 
-load_dotenv()  # Load environment variables from .env
+logging.basicConfig(level=logging.INFO)
+
+# Load environment variables from .env
+load_dotenv()
+
+# Initialize Flask application
 application = Flask(__name__)
-application.secret_key = os.getenv('SECRET_KEY')
+application.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+# Enable CSRF protection
+csrf = CSRFProtect(application)
+
+# Enable rate limiting
+limiter = Limiter(
+    get_remote_address,
+    app=application,
+    default_limits=["200 per day", "50 per hour"]
+)
+
 
 # Define base directory
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -17,6 +41,7 @@ base_dir = os.path.abspath(os.path.dirname(__file__))
 # Configuration for SQLite database
 application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(base_dir, 'turf_system.db')
 application.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 # Initialize the database
 db = SQLAlchemy(application)
 
@@ -27,6 +52,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(10), nullable=False)  # 'admin', 'manager', 'user'
+
 
 class Turf(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -39,6 +65,7 @@ class Turf(db.Model):
     manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     bookings = db.relationship('Booking', backref='turf', cascade="all, delete-orphan")
 
+
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     turf_id = db.Column(db.Integer, db.ForeignKey('turf.id'), nullable=False)
@@ -46,38 +73,54 @@ class Booking(db.Model):
     time_slot = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(20), default='Pending')
 
+
+
+
 # Routes
 @application.route('/')
 def home():
     return render_template('home.html')
-    
-    
+
+
+
 
 @application.route('/login', methods=['GET', 'POST'])
+@csrf.exempt  # CSRF protection is disabled for demonstration; consider enabling it.
+@limiter.limit("5 per minute")  # Limit login attempts
 def login():
     # Retrieve admin credentials from environment variables
     admin_username = os.getenv("ADMIN_USERNAME")
     admin_password = os.getenv("ADMIN_PASSWORD")
 
-    # Check if admin credentials are set
     if not admin_username or not admin_password:
         raise ValueError("Admin username or password environment variables are not set")
 
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        role = request.form['role']
+    # Handle GET request to display the login form
+    if request.method == 'GET':
+        return render_template('login.html')
+
+    # Handle POST request to process login
+    elif request.method == 'POST':
+        # Validate the origin of the request
+        origin = request.headers.get('Origin')
+        if not origin or "yourdomain.com" not in origin:
+            return "Invalid origin", 403
+
+        # Sanitize inputs
+        username = escape(request.form.get('username', '').strip())
+        password = escape(request.form.get('password', '').strip())
+        role = escape(request.form.get('role', '').strip())
 
         # Admin Login
         if role == "admin":
             if username == admin_username and password == admin_password:
                 session['role'] = 'admin'
-                session['user_id'] = 0  # No specific ID for admin
+                session['user_id'] = 0
                 flash('Logged in as Admin.')
                 return redirect(url_for('admin_dashboard'))
             else:
                 flash('Invalid Admin credentials!')
-        
+
         # Manager/User Login
         else:
             user = User.query.filter_by(username=username, password=password, role=role).first()
@@ -92,14 +135,30 @@ def login():
             else:
                 flash('Invalid credentials or role selection!')
 
-    return render_template('login.html')
+        return redirect(url_for('login'))
+
+    # Reject other HTTP methods explicitly
+    return "Method Not Allowed", 405
+
 
 @application.route('/register', methods=['GET', 'POST'])
+@csrf.exempt  # Remove this line if you want to enable CSRF for both GET and POST
+@limiter.limit("3 per minute")  # Limit to 3 registration attempts per minute
 def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
+    if request.method == 'GET':
+        # Render the registration form
+        return render_template('register.html')
+
+    elif request.method == 'POST':
+        # Sanitize and validate inputs
+        username = escape(request.form['username'].strip())
+        email = escape(request.form['email'].strip())
+        password = escape(request.form['password'].strip())
+
+        # Basic validation
+        if not username or not email or not password:
+            flash("All fields are required!")
+            return redirect(url_for('register'))
 
         # Check for unique username and email
         existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
@@ -107,14 +166,18 @@ def register():
             flash('Username or email already exists!')
             return redirect(url_for('register'))
 
+        # Hash the password before storing it
+        hashed_password = generate_password_hash(password)
+
         # Create a new user
-        new_user = User(username=username, email=email, password=password, role='user')
+        new_user = User(username=username, email=email, password=hashed_password, role='user')
         db.session.add(new_user)
         db.session.commit()
         flash('Registration successful! Please log in.')
         return redirect(url_for('login'))
 
-    return render_template('register.html')
+    # Explicitly reject other methods
+    return "Method Not Allowed", 405
 
 @application.route('/logout')
 def logout():
@@ -123,7 +186,9 @@ def logout():
     flash("You have been logged out successfully.")
     return redirect(url_for('login'))
 
-@application.route('/admin', methods=['GET', 'POST'])
+
+@application.route('/admin', methods=['GET'])
+@limiter.limit("10 per minute")
 def admin_dashboard():
     if 'role' in session and session['role'] == 'admin':
         managers = User.query.filter_by(role='manager').all()
@@ -159,6 +224,7 @@ def add_manager():
     return redirect(url_for('login'))
 
 @application.route('/admin/edit_manager/<int:manager_id>', methods=['GET'])
+
 def edit_manager(manager_id):
     if 'role' in session and session['role'] == 'admin':
         manager = User.query.get(manager_id)
@@ -207,7 +273,9 @@ def delete_manager():
             flash('Turf Manager deleted successfully.')
         return redirect(url_for('admin_dashboard'))
 
+
 @application.route('/manager_dashboard', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def manager_dashboard():
     if session.get('role') != 'manager':
         return redirect(url_for('login'))
@@ -291,14 +359,22 @@ def view_turfs():
     return redirect(url_for('login'))
     
     
-@application.route('/debug_turfs')
+@application.route('/debug_turfs', methods=['GET'])
+@csrf.exempt  # CSRF is disabled, but additional safeguards are implemented
+@limiter.limit("2 per minute")
 def debug_turfs():
+    # Log access for auditing
+    logging.info(f"Debug turfs accessed by user: {session.get('user_id')}, role: {session.get('role')}")
+
+    # Restrict access to admins only
+    if 'role' not in session or session['role'] != 'admin':
+        return "Unauthorized", 403
+
+    # Fetch turfs and return limited data
     turfs = Turf.query.all()
-    return {turf.id: {
-        "name": turf.name,
-        "manager_id": turf.manager_id,
-        "time_slots": turf.time_slots
-    } for turf in turfs}
+    return jsonify({turf.id: {"name": turf.name} for turf in turfs})  
+
+
 
 @application.route('/manager/edit_turf/<int:turf_id>', methods=['GET', 'POST'])
 def edit_turf(turf_id):
@@ -346,6 +422,7 @@ def delete_turf():
             flash('Unauthorized action or Turf not found.')
     return redirect(url_for('manager_dashboard'))
 
+
 @application.route('/manager/accept_booking', methods=['POST'])
 def accept_booking():
     if 'user_id' in session and session.get('role') == 'manager':
@@ -365,7 +442,9 @@ def accept_booking():
         return redirect(url_for('view_turfs'))
     return redirect(url_for('login'))
 
+
 @application.route('/user_dashboard', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def user_dashboard():
     if session.get('role') != 'user':
         return redirect(url_for('login'))
@@ -419,6 +498,7 @@ def book_turf():
     else:
         return redirect(url_for('login'))
 
+
 @application.route('/history', methods=['GET'])
 def booking_history():
     if 'user_id' in session:
@@ -451,21 +531,15 @@ def delete_booking():
 def debug():
     turfs = Turf.query.all()
     return {turf.id: turf.photo for turf in turfs}
+    
 
 
+    
 
 
 
 if __name__ == '__main__':
-    # Ensure the database is initialized
     with application.app_context():
-        db.create_all()
-
-    # Use environment variables to manage configurations
-    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
-    host = os.getenv("FLASK_HOST", "0.0.0.0")
-    port = int(os.getenv("FLASK_PORT", "8080"))
-
-    # Run the application with debug mode disabled by default
-    application.run(debug=debug_mode, host=host, port=port)
+        db.create_all()  
+    application.run(debug=True,host='0.0.0.0',port=8080)
 
