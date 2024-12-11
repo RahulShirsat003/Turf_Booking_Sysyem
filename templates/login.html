@@ -130,6 +130,9 @@
     <div class="container">
         <h2>Login</h2>
         <form method="post" action="/login">
+            <!-- CSRF Token -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
             <label for="username">Username</label>
             <input type="text" id="username" name="username" placeholder="Enter your username" required>
 
@@ -138,6 +141,7 @@
 
             <label for="role">Login as</label>
             <select id="role" name="role" required>
+                <option value="" disabled selected>Select your role</option>
                 <option value="user">User</option>
                 <option value="manager">Turf Manager</option>
                 <option value="admin">Admin</option>

@@ -85,7 +85,6 @@ def home():
 
 
 @application.route('/login', methods=['GET', 'POST'])
-@csrf.exempt  # CSRF protection is disabled for demonstration; consider enabling it.
 @limiter.limit("5 per minute")  # Limit login attempts
 def login():
     # Retrieve admin credentials from environment variables
@@ -101,11 +100,6 @@ def login():
 
     # Handle POST request to process login
     elif request.method == 'POST':
-        # Validate the origin of the request
-        origin = request.headers.get('Origin')
-        if not origin or "yourdomain.com" not in origin:
-            return "Invalid origin", 403
-
         # Sanitize inputs
         username = escape(request.form.get('username', '').strip())
         password = escape(request.form.get('password', '').strip())
@@ -141,8 +135,10 @@ def login():
     return "Method Not Allowed", 405
 
 
+
+        
+        
 @application.route('/register', methods=['GET', 'POST'])
-@csrf.exempt  # Remove this line if you want to enable CSRF for both GET and POST
 @limiter.limit("3 per minute")  # Limit to 3 registration attempts per minute
 def register():
     if request.method == 'GET':
@@ -151,9 +147,9 @@ def register():
 
     elif request.method == 'POST':
         # Sanitize and validate inputs
-        username = escape(request.form['username'].strip())
-        email = escape(request.form['email'].strip())
-        password = escape(request.form['password'].strip())
+        username = escape(request.form.get('username', '').strip())
+        email = escape(request.form.get('email', '').strip())
+        password = escape(request.form.get('password', '').strip())
 
         # Basic validation
         if not username or not email or not password:

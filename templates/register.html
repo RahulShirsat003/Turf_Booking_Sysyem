@@ -111,6 +111,9 @@
     <div class="container">
         <h2>Register</h2>
         <form method="post" action="/register">
+            <!-- CSRF Token -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
             <label for="username">Username</label>
             <input type="text" id="username" name="username" placeholder="Enter your username" required>
 
