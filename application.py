@@ -262,7 +262,7 @@ def update_manager():
                 flash(f'Error updating manager: {db_error}')
             return redirect(url_for('admin_dashboard'))
 
-        flash('Turf Manager not found.')
+        flash('manager not found.')
         return redirect(url_for('admin_dashboard'))
     flash('not have access.')
     return redirect(url_for('login'))
@@ -287,7 +287,7 @@ def delete_manager():
             db.session.commit()
             flash('Turf Manager deleted successfully.')
         else:
-            flash('Turf Manager not found.')
+            flash('No turf manager.')
         return redirect(url_for('admin_dashboard'))
     flash('no access.')
     return redirect(url_for('login'))
