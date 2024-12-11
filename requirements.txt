@@ -10,7 +10,8 @@ Babel==2.9.1
 pylint==2.17.5
 python-dotenv==1.0.0
 Flask-WTF==1.1.1
-Werkzeug==2.3.7
 Flask-SQLAlchemy
 gunicorn
 Flask-Limiter
+Werkzeug==2.3.7
+MarkupSafe==2.1.3

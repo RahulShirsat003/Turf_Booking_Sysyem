@@ -12,8 +12,8 @@ phases:
   pre_build:
     commands:
       - echo "Running pre-build checks..."
-      - python --version  # Confirm Python version
-      - pylint $CODEBUILD_SRC_DIR/*.py || true  # Static analysis
+      - python --version  
+      - pylint $CODEBUILD_SRC_DIR/*.py || true  
 
 
   post_build:
