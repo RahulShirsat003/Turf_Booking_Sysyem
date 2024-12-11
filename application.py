@@ -15,8 +15,7 @@ application.secret_key = os.getenv('SECRET_KEY')
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 
-application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///'
-+ os.path.join(base_dir, 'turf_system.db')
+application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///'+ os.path.join(base_dir, 'turf_system.db')
 application.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(application)
