@@ -94,11 +94,9 @@ def login():
     if not admin_username or not admin_password:
         raise ValueError("Admin username or password environment variables are not set")
 
-    # Handle GET request to display the login form
     if request.method == 'GET':
         return render_template('login.html')
 
-    # Handle POST request to process login
     elif request.method == 'POST':
         # Sanitize inputs
         username = escape(request.form.get('username', '').strip())
@@ -113,27 +111,22 @@ def login():
                 flash('Logged in as Admin.')
                 return redirect(url_for('admin_dashboard'))
             else:
-                flash('Invalid Admin credentials!')
+                flash('Invalid login credentials!')
 
         # Manager/User Login
         else:
-            user = User.query.filter_by(username=username, password=password, role=role).first()
-            if user:
+            user = User.query.filter_by(username=username, role=role).first()
+            if user and check_password_hash(user.password, password):
                 session['user_id'] = user.id
                 session['role'] = user.role
                 flash(f"Logged in as {role.capitalize()}.")
-                if role == "manager":
-                    return redirect(url_for('manager_dashboard'))
-                elif role == "user":
-                    return redirect(url_for('user_dashboard'))
+                return redirect(url_for(f"{role}_dashboard"))
             else:
-                flash('Invalid credentials or role selection!')
+                flash('Invalid login credentials!')
 
         return redirect(url_for('login'))
 
-    # Reject other HTTP methods explicitly
     return "Method Not Allowed", 405
-
 
 
         
