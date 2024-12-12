@@ -70,13 +70,6 @@ class Booking(db.Model):
 def validate_admin_credentials(username, password):
     """
     Validate admin credentials from environment variables.
-
-    Args:
-        username (str): Admin username.
-        password (str): Admin password.
-
-    Returns:
-        bool: True if credentials are valid, otherwise False.
     """
     admin_username = os.getenv("ADMIN_USERNAME")
     admin_password = os.getenv("ADMIN_PASSWORD")
@@ -209,12 +202,6 @@ def edit_manager(manager_id):
     """
     Edit a turf manager's details.
 
-    Args:
-        manager_id (int): ID of the manager to edit.
-
-    Returns:
-        Renders the edit manager page if the manager exists and the user 
-        has admin privileges.
     """
     if session.get('role') == 'admin':
         manager = User.query.get(manager_id)
@@ -231,14 +218,6 @@ def update_manager():
     """
     Update a turf manager's details.
 
-    Args:
-        manager_id (int): ID of the manager to update.
-        username (str): New username.
-        email (str): New email.
-        password (str, optional): New password.
-
-    Returns:
-        Redirects to the admin dashboard after updating the manager.
     """
     if session.get('role') == 'admin':
         manager_id = request.form['manager_id']
@@ -272,12 +251,6 @@ def update_manager():
 def delete_manager():
     """
     Delete a turf manager.
-
-    Args:
-        manager_id (int): ID of the manager to delete.
-
-    Returns:
-        Redirects to the admin dashboard after deletion.
     """
     if session.get('role') == 'admin':
         manager_id = request.form['manager_id']
@@ -329,11 +302,6 @@ def turf_image(turf_id):
     """
     Retrieve the image for a specified turf.
 
-    Args:
-        turf_id (int): ID of the turf.
-
-    Returns:
-        Flask response: The image file if available, or a 404 error.
     """
     turf = Turf.query.get(turf_id)
     if turf and turf.photo_data:
@@ -351,9 +319,6 @@ def view_turfs():
     """
     Display all turfs for the logged-in manager.
 
-    Returns:
-        Renders the turfs view page if the user is a manager,
-        otherwise redirects to the login page.
     """
     if 'user_id' in session and session.get('role') == 'manager':
         turfs = Turf.query.filter_by(manager_id=session['user_id']).all()
@@ -384,9 +349,6 @@ def view_turfs():
 def debug_turfs():
     """
     Debug endpoint to view all turfs.
-
-    Returns:
-        dict: A dictionary with turf details.
     """
     turfs = Turf.query.all()
     return {
@@ -404,11 +366,6 @@ def edit_turf(turf_id):
     """
     Edit a specific turf for the logged-in manager.
 
-    Args:
-        turf_id (int): ID of the turf to edit.
-
-    Returns:
-        Renders the edit turf page or redirects based on the session and input.
     """
     if 'user_id' in session and session.get('role') == 'manager':
         turf = Turf.query.get(turf_id)
@@ -468,9 +425,6 @@ def delete_turf():
 def accept_booking():
     """
     Allow a manager to accept a booking for their turf.
-
-    Returns:
-        Redirects to the turfs view page after updating booking status.
     """
     if 'user_id' in session and session.get('role') == 'manager':
         booking_id = request.form['booking_id']
