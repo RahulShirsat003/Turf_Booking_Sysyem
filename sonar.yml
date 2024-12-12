@@ -18,7 +18,7 @@ phases:
       - yum install -y jq 
       - retry_count=3
       - for i in $(seq 1 $retry_count); do wget https://archive.apache.org/dist/maven/maven-3/3.5.4/binaries/apache-maven-3.5.4-bin.tar.gz && break || sleep 10; done
-      - tar xzf apache-maven-3.5.4-bin.tar.gz || true
+      - tar xzf apache-maven-3.5.4-bin.tar.gz 
       - ln -s apache-maven-3.5.4 maven
       - wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-3.3.0.1492-linux.zip
       - unzip ./sonar-scanner-cli-3.3.0.1492-linux.zip
@@ -28,7 +28,7 @@ phases:
   build:
     commands:
       
-      - find / -name pom.xml -exec mv {} ./pom.xml \; || true  
+      - find / -name pom.xml -exec mv {} ./pom.xml \; 
       
       - mvn sonar:sonar -Dsonar.login=$SONARCLOUD_TOKEN -Dsonar.host.url=$HOST -Dsonar.projectKey=$PROJECTKEY -Dsonar.organization=$SONARCLOUD_ORG
       - sleep 5
